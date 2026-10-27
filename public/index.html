@@ -2,8 +2,9 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, maximum-scale=1">
 <meta name="description" content="Lot of Chaos: a parody parking-lot game. Find a spot before your patience runs out.">
+<meta name="apple-mobile-web-app-capable" content="yes"><meta name="mobile-web-app-capable" content="yes"><meta name="theme-color" content="#e31837">
 <style>:root{padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}img{max-width:100%}</style>
 <title>Lot of Chaos</title>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Luckiest+Guy&family=Nunito:wght@600;800;900&display=swap">
@@ -66,6 +67,30 @@ h2.xl{font-size:44px}.btn.xl{font-size:20px;padding:12px 26px}
 .briefMissions div{background:var(--bg);border:2px solid var(--fg);border-radius:10px;padding:10px 14px;font-weight:900;font-size:16px;display:flex;justify-content:space-between;gap:10px;animation:pop .3s ease-out}
 .briefMissions div span:last-child{color:var(--good);white-space:nowrap}
 @media (pointer:coarse){.keys{display:none}}
+body{touch-action:manipulation;-webkit-user-select:none;user-select:none;-webkit-touch-callout:none}
+@media (max-width:640px), (max-height:520px){
+  #app{padding-left:max(8px,env(safe-area-inset-left,0px));padding-right:max(8px,env(safe-area-inset-right,0px));padding-block:4px;gap:5px}
+  header{gap:4px 8px;min-height:0;display:grid;grid-template-columns:1fr auto auto auto;align-items:center}
+  h1{font-size:18px;text-shadow:1px 1px 0 var(--accent-2);grid-column:1}
+  .hud{grid-column:1 / -1;grid-row:2;display:flex;flex-wrap:nowrap;justify-content:space-between;gap:6px;font-size:13px;overflow:hidden}
+  .hud > div{display:flex;flex-direction:column;align-items:flex-start;min-width:0}.hud .lbl{font-size:8px;letter-spacing:.06em}
+  .meter{width:26vw;min-width:64px;height:9px}.rep{width:46px;height:7px}.rep i{height:13px;top:-3px}
+  #freeWrap,#bestWrap{display:none}
+  .btn.sm{padding:4px 7px;font-size:11px;box-shadow:2px 2px 0 var(--fg)}
+  #mute,#voice{font-size:0}#mute::before{content:"\1F50A";font-size:14px}#voice::before{content:"\1F5E3";font-size:14px}
+  #mute[aria-pressed="true"]::before{content:"\1F507"}#voice[aria-pressed="false"]::before{content:"\1F910"}
+  #stage{border-width:2px;border-radius:10px}
+  .missions{top:34px;left:8px;padding:6px 9px;gap:4px;font-size:12px;max-width:58%;border-radius:10px}
+  .missions .ttl{font-size:9px}.missions b{width:14px;height:14px;font-size:10px;line-height:12px;border-radius:4px}.missions small{display:inline;margin-left:6px}
+  .event{font-size:10px;padding:3px 8px}
+  .feed{top:6px;width:min(96%,440px)}.feed div{font-size:11px;padding:4px 8px}
+  .pad{bottom:calc(10px + env(safe-area-inset-bottom,0px));gap:8px}.pad.left{left:8px}.pad.right{right:8px}.pad .rowk{gap:8px}
+  .pad .k{width:54px;height:54px;font-size:20px;opacity:.92}.pad .k.honk{width:62px;height:62px;font-size:13px}.pad .k.alt{width:46px;height:46px;font-size:11px}
+  .card{padding:14px 14px;border-width:2px;box-shadow:4px 4px 0 var(--accent);border-radius:12px}.card h2{font-size:24px}h2.xl{font-size:34px}.btn.xl{font-size:17px;padding:10px 20px}
+  .big{font-size:30px}.briefMissions div{font-size:14px;padding:8px 10px}
+  #argue{top:32%;padding:10px 12px}
+}
+@media (max-height:420px){header{display:none}#app{padding-block:2px}}
 .missions{position:absolute;left:12px;top:44px;background:rgba(29,34,48,.9);color:#fff;font-weight:900;font-size:clamp(14px,1.9vw,19px);padding:10px 14px;border-radius:14px;pointer-events:none;display:flex;flex-direction:column;gap:8px;max-width:min(62%,360px);border:2px solid rgba(255,255,255,.25)}
 .missions .ttl{font-size:11px;letter-spacing:.12em;text-transform:uppercase;color:#ffcc00;font-weight:900}
 .missions div.m{display:flex;gap:10px;align-items:center;line-height:1.2}.missions .done{color:#5ef08a;text-decoration:line-through}
@@ -98,11 +123,12 @@ label.tog{display:flex;gap:6px;align-items:center;font-weight:800;font-size:13px
       <div><span class="lbl">Score</span><span id="score">0</span></div>
       <div><span class="lbl">Round</span><span id="round">1</span></div>
       <div><span class="lbl">Dings</span><span id="dings">0 / 3</span></div>
-      <div><span class="lbl">Free</span><span id="free">0</span></div>
-      <div><span class="lbl">Best</span><span id="best">0</span></div>
+      <div id="freeWrap"><span class="lbl">Free</span><span id="free">0</span></div>
+      <div id="bestWrap"><span class="lbl">Best</span><span id="best">0</span></div>
     </div>
     <button class="btn ghost sm" id="mute" type="button" aria-pressed="false">Sound: on</button>
     <button class="btn ghost sm" id="voice" type="button" aria-pressed="true">Voices: on</button>
+    <button class="btn ghost sm" id="fs" type="button" aria-label="Full screen" hidden>&#x26F6;</button>
   </header>
   <div id="stage">
     <canvas id="c"></canvas>
@@ -779,7 +805,7 @@ function fillVehicleSelect(sel) {
 
 // ---------- render ----------
 const cv = $('c'), ctx = cv.getContext('2d'); let dpr = 1;
-function resize() { dpr = Math.min(2, window.devicePixelRatio || 1); const r = cv.getBoundingClientRect(); cv.width = Math.round(r.width * dpr); cv.height = Math.round(r.height * dpr); }
+function resize() { dpr = Math.min(window.innerWidth < 700 ? 1.5 : 2, window.devicePixelRatio || 1); const r = cv.getBoundingClientRect(); cv.width = Math.round(r.width * dpr); cv.height = Math.round(r.height * dpr); }
 window.addEventListener('resize', resize);
 function rrect(x, y, w, h, r) { ctx.beginPath(); ctx.moveTo(x + r, y); ctx.arcTo(x + w, y, x + w, y + h, r); ctx.arcTo(x + w, y + h, x, y + h, r); ctx.arcTo(x, y + h, x, y, r); ctx.arcTo(x, y, x + w, y, r); ctx.closePath(); }
 function drawCar(c, color, isPlayer, blink) {
@@ -815,8 +841,9 @@ function render() {
   const cw = cv.width, ch = cv.height;
   ctx.setTransform(1, 0, 0, 1, 0, 0); ctx.fillStyle = '#3f4654'; ctx.fillRect(0, 0, cw, ch);
   if (!player) return;
-  const zoom = clamp(Math.min(cw / (720 * dpr), ch / (720 * dpr)), 0.55, 1.6) * dpr;
-  const camx = clamp(cam.x, cw / 2 / zoom, W - cw / 2 / zoom), camy = clamp(cam.y, ch / 2 / zoom, H - ch / 2 / zoom);
+  const portrait = ch > cw * 1.1, zoom = clamp(portrait ? Math.max(cw / (520 * dpr), 0.6) : Math.min(cw / (720 * dpr), ch / (720 * dpr)), 0.55, 1.6) * dpr;
+  const padPx = portrait && matchMedia('(pointer:coarse)').matches ? 150 * dpr : 0;
+  const camx = clamp(cam.x, cw / 2 / zoom, W - cw / 2 / zoom), camy = clamp(cam.y + padPx / 2 / zoom, ch / 2 / zoom, H - (ch / 2 - padPx) / zoom);
   ctx.setTransform(zoom, 0, 0, zoom, cw / 2 - camx * zoom + (player.bump ? rnd(-3, 3) : 0), ch / 2 - camy * zoom);
   const rain = S.event.id === 'rain';
   ctx.fillStyle = rain ? '#3f4753' : '#4b525f'; ctx.fillRect(0, 0, W, H);
@@ -868,7 +895,7 @@ function render() {
   if (argue) { ctx.save(); ctx.translate((walker || player).x + 30, (walker || player).y - 20); ctx.fillStyle = '#e31837'; ctx.beginPath(); ctx.arc(0, 0, 11, 0, 6.28); ctx.fill(); ctx.fillStyle = '#f1c27d'; ctx.beginPath(); ctx.arc(0, 0, 7, 0, 6.28); ctx.fill(); ctx.restore(); }
   for (const b of bubbles) drawBubble(b);
   if (parkTimer > 0) { ctx.strokeStyle = '#5ef08a'; ctx.lineWidth = 5; ctx.beginPath(); ctx.arc(player.x, player.y, 46, -Math.PI / 2, -Math.PI / 2 + parkTimer / 0.8 * Math.PI * 2); ctx.stroke(); }
-  if (rain) { ctx.strokeStyle = 'rgba(200,220,255,.35)'; ctx.lineWidth = 1.5; ctx.beginPath(); const off = (rainT * 900) % 40; for (let i = 0; i < 160; i++) { const x = (i * 97 + off * 0.3) % W, y = ((i * 193) + off * 12) % H; ctx.moveTo(x, y); ctx.lineTo(x - 4, y + 14); } ctx.stroke(); }
+  if (rain) { ctx.strokeStyle = 'rgba(200,220,255,.35)'; ctx.lineWidth = 1.5; ctx.beginPath(); const off = (rainT * 900) % 40; for (let i = 0, n = cw < 900 ? 70 : 160; i < n; i++) { const x = (i * 97 + off * 0.3) % W, y = ((i * 193) + off * 12) % H; ctx.moveTo(x, y); ctx.lineTo(x - 4, y + 14); } ctx.stroke(); }
   // minimap
   ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
   const mw = 84, mh = 109, mx = cw / dpr - mw - 10, my = 10;
@@ -890,8 +917,9 @@ function frame(now) { const dt = Math.min(0.05, (now - last) / 1000); last = now
 const KEYMAP = { ArrowUp: 'up', KeyW: 'up', ArrowDown: 'down', KeyS: 'down', ArrowLeft: 'left', KeyA: 'left', ArrowRight: 'right', KeyD: 'right', Space: 'honk', KeyH: 'honk', KeyB: 'blink', KeyE: 'out' };
 window.addEventListener('keydown', e => { if (e.target && e.target.tagName === 'SELECT') return; const k = KEYMAP[e.code]; if (k) { keys[k] = 1; e.preventDefault(); } });
 window.addEventListener('keyup', e => { const k = KEYMAP[e.code]; if (k) { if (k === 'out' || k === 'blink') setTimeout(() => { keys[k] = 0; }, 60); else keys[k] = 0; e.preventDefault(); } });
+$('stage').addEventListener('touchmove', e => e.preventDefault(), { passive: false });
 document.querySelectorAll('.pad .k').forEach(el => { const k = el.dataset.k, on = e => { e.preventDefault(); keys[k] = 1; el.classList.add('on'); }, off = e => { e.preventDefault(); keys[k] = 0; el.classList.remove('on'); }; el.addEventListener('pointerdown', on); el.addEventListener('pointerup', off); el.addEventListener('pointercancel', off); el.addEventListener('pointerleave', off); });
-$('startBtn').addEventListener('click', () => { $('startOv').hidden = true; newGame(); });
+$('startBtn').addEventListener('click', () => { $('startOv').hidden = true; keepAwake(); newGame(); });
 $('goBtn').addEventListener('click', drive);
 $('nextBtn').addEventListener('click', () => { $('roundOv').hidden = true; S.vehicle = $('vehicle2').value || S.vehicle; S.round++; startRound(); });
 $('againBtn').addEventListener('click', () => { $('overOv').hidden = true; $('startOv').hidden = false; fillVehicleSelect($('vehicle')); });
@@ -911,6 +939,15 @@ $('copyBtn').addEventListener('click', e => {
   try { navigator.clipboard.writeText(text).then(done).catch(() => { $('copyMsg').textContent = text; }); } catch (x) { $('copyMsg').textContent = text; }
 });
 try { window.speechSynthesis && window.speechSynthesis.getVoices(); } catch (e) {}
+// phones: offer full screen, keep the screen awake while playing
+const fsBtn = $('fs'), appEl = $('app');
+if (document.fullscreenEnabled && matchMedia('(pointer:coarse)').matches) fsBtn.hidden = false;
+fsBtn.addEventListener('click', () => { try { if (document.fullscreenElement) document.exitFullscreen(); else appEl.requestFullscreen().catch(() => {}); } catch (e) {} setTimeout(resize, 300); });
+document.addEventListener('fullscreenchange', () => setTimeout(resize, 200));
+let wake = null;
+async function keepAwake() { try { if ('wakeLock' in navigator && !wake) { wake = await navigator.wakeLock.request('screen'); wake.addEventListener('release', () => { wake = null; }); } } catch (e) {} }
+document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible' && S.running) keepAwake(); });
+window.addEventListener('orientationchange', () => setTimeout(resize, 300));
 // challenge link: #c-<score>-<seed>-<d|r>
 (() => { const m = /^#c-(\d+)-(\d+)-([dr])$/.exec(location.hash); if (!m) return; const ch = $('challenge'); ch.hidden = false; ch.textContent = `Challenge: someone scored ${m[1]} on ${m[3] === 'd' ? 'the daily lot of ' + m[2] : 'a random lot'}. Beat it.`; if (m[3] === 'd' && m[2] === todayKey()) $('mode').value = 'daily'; })();
 function renderCareer() { const ul = $('career'); ul.innerHTML = CAREER.map(c => { const v = Math.min(c.target, c.get(S.career)); return `<li class="${v >= c.target ? 'done' : ''}"><span>${c.text}</span><span>${v} / ${c.target}</span></li>`; }).join(''); }
