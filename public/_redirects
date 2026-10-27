@@ -1,0 +1,3 @@
+# Example redirects (one per line: from  to  status)
+# /old-page   /about   301
+# /blog/*     https://blog.example.com/:splat   302
