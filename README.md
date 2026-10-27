@@ -1,6 +1,6 @@
-# Cloudflare Pages starter
+# Cloudflare Workers static site starter
 
-Static site + one Pages Function, ready to deploy to Cloudflare Pages (free plan).
+Static site + one API route, deployed as a Cloudflare Worker with static assets (free plan).
 
 ## Structure
 
@@ -12,28 +12,19 @@ public/            ← everything in here is deployed as-is
   _headers         → security + cache headers
   _redirects       → redirect rules (examples inside)
   assets/          → css / js
-functions/
-  api/hello.js     → serverless endpoint at /api/hello
+src/index.js       → Worker: handles /api/hello, serves public/ for everything else
 wrangler.toml      → config for the Wrangler CLI
 ```
 
 ## Deploy — Option A: Git (recommended)
 
-1. Push this folder to a GitHub or GitLab repo.
-2. Cloudflare dashboard → **Workers & Pages → Create → Pages → Connect to Git**.
-3. Pick the repo. Build settings:
-   - Framework preset: **None**
-   - Build command: *(leave empty)*
-   - Build output directory: **public**
-4. Save and Deploy. You get `https://<project>.pages.dev` in about a minute.
-   Every push to `main` redeploys; other branches get preview URLs.
+1. Push this folder to a GitHub repo.
+2. Cloudflare dashboard → **Workers & Pages → Create → Workers → Import a repository**.
+3. Pick the repo. Build command: *(empty)*. Deploy command: `npx wrangler deploy`.
+4. Save and Deploy. You get `https://<name>.<account>.workers.dev` in about a minute.
+   Every push to `main` redeploys.
 
-## Deploy — Option B: Direct upload (no Git)
-
-Dashboard → Workers & Pages → Create → Pages → **Upload assets** → drag the `public` folder in.
-(Note: Pages Functions only deploy via Git or Wrangler, not via drag-and-drop.)
-
-## Deploy — Option C: Wrangler CLI
+## Deploy — Option B: Wrangler CLI
 
 ```bash
 npm install
@@ -41,13 +32,13 @@ npx wrangler login
 npm run deploy
 ```
 
-Local preview (includes the function): `npm run dev` → http://localhost:8788
+Local preview: `npm run dev` → http://localhost:8787
 
 ## Adding your own domain later
 
-Pages project → **Custom domains → Set up a custom domain**.
+Worker → **Settings → Domains & Routes → Add → Custom domain**.
 If the domain is registered at Cloudflare it's a one-click DNS record; otherwise add the CNAME they show you. SSL is automatic and free.
 
 ## Free tier limits (as of late 2026)
 
-Unlimited bandwidth and sites, 500 builds/month, 100k Function requests/day — plenty for a personal site or portfolio.
+Static asset requests are free and unlimited; 100k Worker requests/day — plenty for a personal site or portfolio.

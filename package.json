@@ -1,9 +1,9 @@
 {
-  "name": "my-site",
+  "name": "lotofchaos",
   "private": true,
   "scripts": {
-    "dev": "wrangler pages dev public",
-    "deploy": "wrangler pages deploy public"
+    "dev": "wrangler dev",
+    "deploy": "wrangler deploy"
   },
   "devDependencies": {
     "wrangler": "^4"
