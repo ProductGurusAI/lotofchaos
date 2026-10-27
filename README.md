@@ -1,17 +1,18 @@
-# Cloudflare Workers static site starter
+# Lot of Chaos — lotofchaos.xyz
 
-Static site + one API route, deployed as a Cloudflare Worker with static assets (free plan).
+A parody parking-lot browser game. Deployed as a Cloudflare Worker with static assets (free plan).
+
+The game is `public/index.html` (self-contained) plus recorded NPC voice clips in `public/voices/`.
 
 ## Structure
 
 ```
 public/            ← everything in here is deployed as-is
-  index.html       → served at /
-  about.html       → served at /about  (Pages strips .html automatically)
+  index.html       → the game, served at /
+  voices/          → NPC voice clips + manifest.json
   404.html         → custom not-found page
   _headers         → security + cache headers
   _redirects       → redirect rules (examples inside)
-  assets/          → css / js
 src/index.js       → Worker: handles /api/hello, serves public/ for everything else
 wrangler.toml      → config for the Wrangler CLI
 ```

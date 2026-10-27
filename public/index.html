@@ -1,31 +1,924 @@
 <!doctype html>
 <html lang="en">
 <head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>My Site</title>
-  <meta name="description" content="A site hosted on Cloudflare Pages.">
-  <link rel="stylesheet" href="/assets/style.css">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="description" content="Lot of Chaos: a parody parking-lot game. Find a spot before your patience runs out.">
+<style>:root{padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}img{max-width:100%}</style>
+<title>Lot of Chaos</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Luckiest+Guy&family=Nunito:wght@600;800;900&display=swap">
+<style>
+/* Layout: one-screen arcade. Thin HUD bar on top, canvas fills the rest, touch pads float over the canvas corners. */
+:root{
+  --bg:#eef0f4;--fg:#1d2230;--muted:#5f6878;--panel:#ffffff;--line:#cfd5e0;
+  --accent:#e31837;--accent-2:#005daa;--warn:#ffcc00;--good:#1fa35a;--bad:#d7263d;
+  --font-display:"Luckiest Guy","Arial Black",Impact,sans-serif;--font-body:"Nunito","Segoe UI",system-ui,sans-serif;
+}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){--bg:#151922;--fg:#eef1f6;--muted:#9aa4b5;--panel:#1f2532;--line:#333b4b;--accent:#ff3b57;--accent-2:#4d9cf0;--warn:#ffd633;--good:#35c072;--bad:#ff5468;color-scheme:dark}}
+:root[data-theme="dark"]{--bg:#151922;--fg:#eef1f6;--muted:#9aa4b5;--panel:#1f2532;--line:#333b4b;--accent:#ff3b57;--accent-2:#4d9cf0;--warn:#ffd633;--good:#35c072;--bad:#ff5468;color-scheme:dark}
+html,body{height:100%}
+body{margin:0;background:var(--bg);color:var(--fg);font-family:var(--font-body);overflow:hidden}
+#app{height:100%;display:flex;flex-direction:column;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));padding-block:8px;box-sizing:border-box;gap:8px}
+header{display:flex;align-items:center;gap:12px;flex-wrap:wrap;min-height:40px}
+h1{font-family:var(--font-display);font-size:clamp(22px,4vw,32px);margin:0;color:var(--accent);letter-spacing:.5px;text-shadow:2px 2px 0 var(--accent-2)}
+.hud{display:flex;gap:12px;align-items:center;flex:1;flex-wrap:wrap;font-weight:900;font-size:15px;font-variant-numeric:tabular-nums}
+.hud .lbl{font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);display:block;font-weight:800}
+.meter{width:min(180px,40vw);height:14px;border-radius:7px;background:var(--line);overflow:hidden;position:relative}
+.meter i{display:block;height:100%;width:100%;background:var(--good);transition:width .15s linear,background .3s}
+.rep{width:90px;height:10px;border-radius:5px;background:linear-gradient(90deg,var(--bad),var(--line) 50%,var(--good));position:relative}
+.rep i{position:absolute;top:-3px;width:4px;height:16px;background:var(--fg);border-radius:2px;left:50%;transition:left .3s}
+.btn{font:inherit;font-weight:900;border:2px solid var(--fg);background:var(--warn);color:#1d2230;border-radius:10px;padding:8px 14px;cursor:pointer;box-shadow:3px 3px 0 var(--fg)}
+.btn:active{transform:translate(2px,2px);box-shadow:1px 1px 0 var(--fg)}
+.btn:focus-visible{outline:3px solid var(--accent);outline-offset:2px}
+.btn.ghost{background:var(--panel);color:var(--fg)}.btn.sm{padding:6px 10px;font-size:13px}
+select{font:inherit;font-weight:800;padding:6px 8px;border-radius:8px;border:2px solid var(--fg);background:var(--panel);color:var(--fg)}
+#stage{position:relative;flex:1;min-height:0;border:3px solid var(--fg);border-radius:14px;overflow:hidden;background:#3f4654;touch-action:none}
+canvas{display:block;width:100%;height:100%}
+[hidden]{display:none!important}
+.overlay{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;padding:16px;background:rgba(14,18,28,.6)}
+.card{background:var(--panel);color:var(--fg);border:3px solid var(--fg);border-radius:16px;padding:20px 22px;max-width:520px;width:100%;box-shadow:6px 6px 0 var(--accent);max-height:100%;overflow:auto;box-sizing:border-box}
+.card h2{font-family:var(--font-display);font-size:30px;margin:0 0 6px;color:var(--accent);text-wrap:balance}
+.card p{margin:6px 0;line-height:1.45}.card ul{margin:8px 0;padding-left:18px;line-height:1.5}
+.card .row{display:flex;gap:10px;flex-wrap:wrap;margin-top:12px;align-items:center}
+.big{font-family:var(--font-display);font-size:40px;color:var(--fg);margin:4px 0}
+kbd{font:inherit;font-size:12px;border:1px solid var(--line);border-bottom-width:3px;border-radius:5px;padding:0 6px;background:var(--bg)}
+.pad{position:absolute;bottom:calc(14px + env(safe-area-inset-bottom,0px));display:none;gap:10px;user-select:none;-webkit-user-select:none}
+.pad.left{left:14px;flex-direction:column}.pad.right{right:14px;flex-direction:column;align-items:flex-end}
+.pad .rowk{display:flex;gap:10px}
+.pad .k{width:60px;height:60px;border-radius:50%;border:3px solid #1d2230;background:rgba(255,204,0,.92);color:#1d2230;font-size:24px;font-weight:900;display:flex;align-items:center;justify-content:center;box-shadow:0 4px 0 #1d2230;touch-action:none}
+.pad .k.on{transform:translateY(3px);box-shadow:0 1px 0 #1d2230;background:#ffe066}
+.pad .k.honk{background:rgba(227,24,55,.92);color:#fff;font-family:var(--font-display);font-size:15px;width:70px;height:70px}
+.pad .k.alt{background:rgba(0,93,170,.9);color:#fff;font-size:13px;font-family:var(--font-display);width:52px;height:52px}
+@media (pointer:coarse){.pad{display:flex}}
+.feed{position:absolute;top:10px;left:50%;transform:translateX(-50%);display:flex;flex-direction:column;align-items:center;gap:4px;pointer-events:none;width:min(92%,440px)}
+.feed div{background:rgba(29,34,48,.88);color:#fff;font-weight:800;font-size:13px;padding:5px 11px;border-radius:999px;animation:pop .25s ease-out;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:100%}
+.feed div.good{background:var(--good)}.feed div.bad{background:var(--bad)}.feed div.pa{background:var(--accent-2)}
+@keyframes pop{from{transform:scale(.6);opacity:0}to{transform:scale(1);opacity:1}}
+@media (prefers-reduced-motion:reduce){.feed div{animation:none}.meter i{transition:none}}
+.small{font-size:12px;color:var(--muted)}
+.card.center{text-align:center}.row.center{justify-content:center}
+h2.xl{font-size:44px}.btn.xl{font-size:20px;padding:12px 26px}
+.lead{font-size:16px;font-weight:800;margin:4px 0 12px}
+.keys{display:flex;flex-wrap:wrap;gap:6px 14px;justify-content:center;font-size:12px;color:var(--muted);margin:12px 0 6px}
+.card details{text-align:left;margin:8px 0}.card summary{cursor:pointer;font-weight:800}.card ul.small{margin:6px 0 0 0;padding-left:18px;line-height:1.5}
+.eyebrow{font-size:11px;letter-spacing:.12em;text-transform:uppercase;color:var(--muted);font-weight:900;margin:0}
+.briefMissions{display:flex;flex-direction:column;gap:8px;margin:8px 0 14px}
+.briefMissions div{background:var(--bg);border:2px solid var(--fg);border-radius:10px;padding:10px 14px;font-weight:900;font-size:16px;display:flex;justify-content:space-between;gap:10px;animation:pop .3s ease-out}
+.briefMissions div span:last-child{color:var(--good);white-space:nowrap}
+@media (pointer:coarse){.keys{display:none}}
+.missions{position:absolute;left:12px;top:44px;background:rgba(29,34,48,.9);color:#fff;font-weight:900;font-size:clamp(14px,1.9vw,19px);padding:10px 14px;border-radius:14px;pointer-events:none;display:flex;flex-direction:column;gap:8px;max-width:min(62%,360px);border:2px solid rgba(255,255,255,.25)}
+.missions .ttl{font-size:11px;letter-spacing:.12em;text-transform:uppercase;color:#ffcc00;font-weight:900}
+.missions div.m{display:flex;gap:10px;align-items:center;line-height:1.2}.missions .done{color:#5ef08a;text-decoration:line-through}
+.missions b{flex:none;display:inline-block;width:20px;height:20px;border-radius:6px;border:2px solid #fff;font-size:14px;line-height:18px;text-align:center}.missions .done b{background:#5ef08a;border-color:#5ef08a;color:#1d2230}
+.missions small{display:block;font-size:.7em;color:#ffcc00;font-weight:800}
+@media (max-width:600px){.missions{font-size:13px;top:40px;max-width:70%}}
+.career{list-style:none;padding:0;margin:8px 0;font-size:13px}.career li{display:flex;justify-content:space-between;gap:8px;padding:2px 0;border-bottom:1px dashed var(--line)}.career li.done{color:var(--good)}
+.event{position:absolute;left:10px;top:10px;background:rgba(29,34,48,.85);color:#fff;font-weight:900;font-size:12px;padding:4px 10px;border-radius:999px;pointer-events:none}
+#argue{position:absolute;left:50%;top:40%;transform:translate(-50%,-50%);background:var(--panel);border:3px solid var(--fg);border-radius:14px;padding:12px 16px;width:min(90%,360px);box-shadow:5px 5px 0 var(--accent);text-align:center}
+#argue .bars{display:flex;flex-direction:column;gap:6px;margin:8px 0}
+#argue .bar{height:14px;border-radius:7px;background:var(--line);overflow:hidden}#argue .bar i{display:block;height:100%;width:0}
+#argue .me i{background:var(--good)}#argue .them i{background:var(--bad)}
+.receipt{display:block;margin:10px auto;max-width:100%;border:1px solid var(--line);background:#fff}
+.lb{font-size:13px;margin:8px 0;padding:0;list-style:none;font-variant-numeric:tabular-nums}
+.lb li{display:flex;justify-content:space-between;border-bottom:1px dashed var(--line);padding:2px 0}
+label.tog{display:flex;gap:6px;align-items:center;font-weight:800;font-size:13px}
+</style>
 </head>
 <body>
-  <header class="wrap">
-    <a class="brand" href="/">My Site</a>
-    <nav>
-      <a href="/">Home</a>
-      <a href="/about">About</a>
-    </nav>
+
+
+
+
+<div id="app">
+  <header>
+    <h1>Lot of Chaos</h1>
+    <div class="hud">
+      <div><span class="lbl">Patience</span><div class="meter" aria-label="Patience"><i id="pat"></i></div></div>
+      <div><span class="lbl">Reputation</span><div class="rep" aria-label="Reputation"><i id="rep"></i></div></div>
+      <div><span class="lbl">Score</span><span id="score">0</span></div>
+      <div><span class="lbl">Round</span><span id="round">1</span></div>
+      <div><span class="lbl">Dings</span><span id="dings">0 / 3</span></div>
+      <div><span class="lbl">Free</span><span id="free">0</span></div>
+      <div><span class="lbl">Best</span><span id="best">0</span></div>
+    </div>
+    <button class="btn ghost sm" id="mute" type="button" aria-pressed="false">Sound: on</button>
+    <button class="btn ghost sm" id="voice" type="button" aria-pressed="true">Voices: on</button>
   </header>
+  <div id="stage">
+    <canvas id="c"></canvas>
+    <div class="event" id="eventTag" hidden></div>
+    <div class="missions" id="missions" hidden></div>
+    <div class="feed" id="feed" aria-live="polite"></div>
+    <div class="pad left" id="padL">
+      <div class="rowk"><div class="k alt" data-k="blink" aria-label="Blinker">BLINK</div><div class="k alt" data-k="out" aria-label="Get out of the car">OUT</div></div>
+      <div class="rowk"><div class="k" data-k="left" aria-label="Steer left">&#9664;</div><div class="k" data-k="right" aria-label="Steer right">&#9654;</div></div>
+    </div>
+    <div class="pad right" id="padR">
+      <div class="k honk" data-k="honk" aria-label="Honk">HONK</div>
+      <div class="rowk"><div class="k" data-k="down" aria-label="Reverse / brake">&#9660;</div><div class="k" data-k="up" aria-label="Gas">&#9650;</div></div>
+    </div>
+    <div id="argue" hidden>
+      <strong id="argueTitle">Argue for your spot!</strong>
+      <div class="bars"><div class="bar me"><i id="argueMe"></i></div><div class="bar them"><i id="argueThem"></i></div></div>
+      <span class="small">Mash HONK / Space to out-shout them</span>
+    </div>
+    <div class="overlay" id="startOv">
+      <div class="card center">
+        <h2 class="xl">Lot of Chaos</h2>
+        <p class="lead">Saturday at Costc0. Find a parking spot before your patience runs out.</p>
+        <div class="row center">
+          <label class="tog">Vehicle <select id="vehicle"><option value="sedan">Sedan</option><option value="hatch">Hatchback (fits tight gaps)</option><option value="pickup">Pickup + trailer (needs 2 spots)</option><option value="van">Minivan (park near a cart return)</option></select></label>
+          <label class="tog">Lot <select id="mode"><option value="daily">Today's lot</option><option value="random">Random lot</option></select></label>
+        </div>
+        <p id="challenge" class="small" hidden></p>
+        <div class="row center"><button class="btn xl" id="startBtn" type="button">Start shopping trip</button></div>
+        <div class="keys" id="keyHelp"><span><kbd>&uarr;&darr;&larr;&rarr;</kbd> drive</span><span><kbd>Space</kbd> honk · hold to blast</span><span><kbd>B</kbd> blinker</span><span><kbd>E</kbd> get out / get in</span></div>
+        <details><summary class="small">How it works</summary>
+          <ul class="small">
+            <li>Green dashed spots are free. Blue spots are accessible parking: park there and you get a ticket.</li>
+            <li>Push stray carts into a CART RETURN for points. Let people cross and your reputation goes up; honk, ding and steal and it goes down. Good reputation means fewer people cut you off.</li>
+            <li>Three dings and your car catches fire. Hit one shopper and you get sued.</li>
+            <li>Press E when stopped to get out of the car. On foot you can push carts to a return, walk up to someone who stole your spot and argue (E again), and get back in with E. Leave the car in a lane for 20 seconds and it gets towed.</li>
+            <li>Each trip has two missions for bonus points. Career missions carry across games.</li>
+          </ul>
+        </details>
+        <details><summary class="small">Career missions</summary><ul class="career" id="career"></ul></details>
+        <p class="small">A parody. Costc0 is not a real store.</p>
+      </div>
+    </div>
+    <div class="overlay" id="briefOv" hidden>
+      <div class="card center brief">
+        <p class="eyebrow" id="briefRound">Trip 1</p>
+        <h2 id="briefEvent">Tuesday, 10 am</h2>
+        <p id="briefDesc" class="small"></p>
+        <p class="eyebrow">Your missions</p>
+        <div class="briefMissions" id="briefMissions"></div>
+        <div class="row center"><button class="btn xl" id="goBtn" type="button">Drive</button></div>
+        <p class="small" id="briefVehicle"></p>
+      </div>
+    </div>
+    <div class="overlay" id="roundOv" hidden>
+      <div class="card">
+        <h2 id="roundTitle">Parked!</h2>
+        <div class="big" id="roundPts">+0</div>
+        <p id="roundMsg"></p>
+        <p id="missionMsg" class="small"></p>
+        <p id="unlockMsg" class="small"></p>
+        <div class="row"><button class="btn" id="nextBtn" type="button">Next trip</button><label class="tog">Vehicle <select id="vehicle2"></select></label></div>
+      </div>
+    </div>
+    <div class="overlay" id="overOv" hidden>
+      <div class="card">
+        <h2 id="overTitle">You gave up</h2>
+        <p id="overMsg"></p>
+        <img id="receiptImg" class="receipt" alt="Your trip receipt" hidden>
+        <div class="row"><button class="btn sm" id="saveBtn" type="button">Save receipt</button><button class="btn sm ghost" id="copyBtn" type="button">Copy challenge link</button><button class="btn" id="againBtn" type="button">Try again</button></div>
+        <p class="small" id="copyMsg"></p>
+        <strong class="small">Best on this device</strong>
+        <ul class="lb" id="lb"></ul>
+      </div>
+    </div>
+  </div>
+</div>
 
-  <main class="wrap">
-    <h1>Hello from Cloudflare Pages</h1>
-    <p>Replace this page with your own content. Edit <code>public/index.html</code>.</p>
-    <p>Server time from a Worker: <strong id="time">loading…</strong></p>
-  </main>
+<script>
+(() => {
+'use strict';
+// ---------- constants ----------
+const W = 1200, H = 1560, STORE_Y = 120, ROAD_Y = 1400;
+const SPOT_W = 44, SPOT_L = 80;
+const BLOCK_Y = [220, 480, 740, 1000];
+const LANE_Y  = [170, 430, 690, 950, 1210];
+const COLS = []; for (let i = 0; i < 23; i++) if (i !== 10 && i !== 11) COLS.push(80 + i * SPOT_W);
+const CROSS_X = 564, LEFT_X = 44, RIGHT_X = 1156;
+const ENTRY = { x: 90, y: ROAD_Y + 60 }, EXIT = { x: 1110, y: ROAD_Y + 60 };
+const CORRALS = [{ x: 528, y: BLOCK_Y[1] + 14, w: 72, h: 132 }, { x: 528, y: BLOCK_Y[3] + 14, w: 72, h: 132 }];
+const DAYS = ['Tuesday, 10 am', 'Thursday, 5:30 pm', 'Saturday, 11 am', 'Sunday, 1 pm', 'Day before a long weekend', 'First day of the new flyer', 'Christmas Eve, 3 pm', 'The day the hot dog went up in price'];
+const EVENTS = [
+  { id: 'none', name: '', desc: '' },
+  { id: 'rain', name: 'Rain', desc: 'Everything slides. Everyone runs.' },
+  { id: 'samples', name: 'Sample Day', desc: 'Crowds block the lanes for free ravioli.' },
+  { id: 'blackfriday', name: 'Black Friday', desc: 'Every spot has someone waiting for it.' },
+  { id: 'gas', name: 'Gas Station Line', desc: 'A queue for cheap gas blocks the east side.' },
+  { id: 'longweekend', name: 'Long Weekend', desc: 'Spot vultures everywhere.' }];
+const VEHICLES = {
+  sedan: { name: 'Sedan', w: 36, l: 64, top: 5.6, steer: 2.2, color: '#e31837', unlock: 1 },
+  hatch: { name: 'Hatchback', w: 26, l: 50, top: 5.2, steer: 2.8, color: '#f08c1b', unlock: 2 },
+  pickup: { name: 'Pickup + trailer', w: 38, l: 96, top: 5.0, steer: 1.5, color: '#2fa8a0', unlock: 3 },
+  van: { name: 'Minivan', w: 38, l: 72, top: 5.2, steer: 2.0, color: '#7e5bc2', unlock: 4 } };
+const INSULTS = ['THAT WAS MY SPOT!', 'LEARN TO **** PARK', 'I WAS HERE FIRST!', '**** YOU, BUDDY', "I'M GETTING THE MANAGER", 'MY BLINKER WAS ON!', 'ARE YOU **** KIDDING ME', 'I HAVE A DASHCAM!', 'GET OUT OF THE CAR!', 'MOVE YOUR **** CART'];
+const PED_HIT = ['HEY!!', 'WATCH IT, ****!', 'MY HIP!', 'I HAVE A RECEIPT!', '**** DRIVERS!', 'I WILL SUE YOU'];
+const PED_IDLE = ['wait, where did I park', 'checking the receipt...', 'hello? yeah I\'m at the store', 'did we need eggs?', 'hold on, texting', 'the chicken was $7.99 again', 'I think it was row G', 'can you hear me now?'];
+const HAZARD = ['just waiting for my wife', 'I\'ll be TWO minutes', 'hazards on, it\'s legal', 'go around, buddy', 'she\'s grabbing a rotisserie'];
+const PA = ['Attention members: a silver sedan is blocking lane 3.', 'Would the owner of the cart on the roof please come to the front.', 'Attention members: please do not fight in the parking lot.', 'Hot dogs are still $1.50. Please calm down.', 'Lane 2 is not a parking spot. Thank you.', 'Please return your carts. We can see you.', 'A child has lost their parents. The parents are fine with it.'];
+const CAR_COLORS = ['#3d7bd9', '#f4f4f2', '#262a33', '#aeb6c2', '#56a35a', '#c33b3b', '#f08c1b', '#7e5bc2', '#2fa8a0', '#e0c9a6', '#d94f8a', '#8a6b4a'];
 
-  <footer class="wrap">
-    <small>&copy; <span id="year"></span> My Site</small>
-  </footer>
+// ---------- languages ----------
+// Who talks in what: 50% English, 10% each Hindi, Punjabi, Mandarin, Farsi, and 10% split across Spanish, Tagalog, Korean, Vietnamese, Arabic.
+const LANGS = [['en', 0.5], ['hi', 0.1], ['pa', 0.1], ['zh', 0.1], ['fa', 0.1], ['es', 0.02], ['tl', 0.02], ['ko', 0.02], ['vi', 0.02], ['ar', 0.02]];
+const TTS_LANG = { en: 'en-US', hi: 'hi-IN', pa: 'pa-IN', zh: 'zh-CN', fa: 'fa-IR', es: 'es-MX', tl: 'fil-PH', ko: 'ko-KR', vi: 'vi-VN', ar: 'ar-SA' };
+const TR = {"THAT WAS MY SPOT!": {"hi": "वो मेरी जगह थी!", "pa": "ਉਹ ਮੇਰੀ ਥਾਂ ਸੀ!", "zh": "那是我的车位！", "fa": "اون جای من بود!", "es": "¡ESE ERA MI LUGAR!", "tl": "AKIN 'YUNG PWESTO NA 'YAN!", "ko": "거기 내 자리였어!", "vi": "ĐÓ LÀ CHỖ CỦA TÔI!", "ar": "هذا كان مكاني!"}, "LEARN TO **** PARK": {"hi": "**** पार्क करना सीखो!", "pa": "**** ਪਾਰਕ ਕਰਨਾ ਸਿੱਖ!", "zh": "学学怎么****停车！", "fa": "یاد بگیر **** پارک کنی!", "es": "¡APRENDE A ESTACIONAR, ****!", "tl": "MATUTONG MAG-PARK, ****!", "ko": "주차 좀 제대로 배워, ****!", "vi": "HỌC ĐẬU XE ĐI, ****!", "ar": "تعلّم تركن السيارة، ****!"}, "I WAS HERE FIRST!": {"hi": "मैं पहले आया था!", "pa": "ਮੈਂ ਪਹਿਲਾਂ ਆਇਆ ਸੀ!", "zh": "我先来的！", "fa": "من اول اینجا بودم!", "es": "¡YO LLEGUÉ PRIMERO!", "tl": "NAUNA AKO DITO!", "ko": "내가 먼저 왔거든!", "vi": "TÔI ĐẾN TRƯỚC MÀ!", "ar": "أنا وصلت أولاً!"}, "**** YOU, BUDDY": {"hi": "**** तुम्हारी, भाई!", "pa": "**** ਤੇਰੀ, ਬਾਈ!", "zh": "****你，哥们！", "fa": "**** تو، رفیق!", "es": "¡**** TÚ, AMIGO!", "tl": "**** KA, PARE!", "ko": "**** 너, 아저씨!", "vi": "**** ÔNG, ÔNG BẠN!", "ar": "**** عليك يا صاحبي"}, "I'M GETTING THE MANAGER": {"hi": "मैं मैनेजर को बुला रहा हूँ!", "pa": "ਮੈਂ ਮੈਨੇਜਰ ਨੂੰ ਬੁਲਾ ਰਿਹਾਂ!", "zh": "我去叫经理！", "fa": "دارم مدیر رو میارم!", "es": "¡VOY A LLAMAR AL GERENTE!", "tl": "TATAWAGIN KO ANG MANAGER!", "ko": "매니저 부를 거야!", "vi": "TÔI GỌI QUẢN LÝ ĐÂY!", "ar": "سأنادي المدير!"}, "MY BLINKER WAS ON!": {"hi": "मेरा इंडिकेटर चालू था!", "pa": "ਮੇਰਾ ਇੰਡੀਕੇਟਰ ਚੱਲ ਰਿਹਾ ਸੀ!", "zh": "我转向灯开着呢！", "fa": "راهنمام روشن بود!", "es": "¡TENÍA LA DIRECCIONAL PUESTA!", "tl": "NAKA-SIGNAL AKO!", "ko": "깜빡이 켰잖아!", "vi": "TÔI BẬT XI-NHAN RỒI MÀ!", "ar": "كان الغمّاز شغّال!"}, "ARE YOU **** KIDDING ME": {"hi": "मज़ाक कर रहे हो क्या, ****?", "pa": "ਮਜ਼ਾਕ ਕਰਦੈਂ, ****?", "zh": "你****开玩笑吧？", "fa": "شوخیت گرفته، ****؟", "es": "¿ME ESTÁS **** TOMANDO EL PELO?", "tl": "NAGBIBIRO KA BA, ****?", "ko": "지금 **** 장난해?", "vi": "ÔNG **** ĐÙA TÔI À?", "ar": "هل تمزح معي، ****؟"}, "I HAVE A DASHCAM!": {"hi": "मेरे पास डैशकैम है!", "pa": "ਮੇਰੇ ਕੋਲ ਡੈਸ਼ਕੈਮ ਹੈ!", "zh": "我有行车记录仪！", "fa": "من دوربین ماشین دارم!", "es": "¡TENGO CÁMARA EN EL AUTO!", "tl": "MAY DASHCAM AKO!", "ko": "나 블랙박스 있어!", "vi": "TÔI CÓ CAMERA HÀNH TRÌNH!", "ar": "عندي كاميرا في السيارة!"}, "GET OUT OF THE CAR!": {"hi": "गाड़ी से बाहर निकलो!", "pa": "ਗੱਡੀ 'ਚੋਂ ਬਾਹਰ ਨਿਕਲ!", "zh": "下车！", "fa": "از ماشین بیا بیرون!", "es": "¡BÁJATE DEL AUTO!", "tl": "BUMABA KA SA KOTSE!", "ko": "차에서 내려!", "vi": "XUỐNG XE NGAY!", "ar": "انزل من السيارة!"}, "MOVE YOUR **** CART": {"hi": "अपनी **** ट्रॉली हटाओ!", "pa": "ਆਪਣੀ **** ਟਰਾਲੀ ਹਟਾ!", "zh": "把你的****购物车挪开！", "fa": "اون **** چرخ دستیت رو بردار!", "es": "¡MUEVE TU **** CARRITO!", "tl": "ALISIN MO 'YANG **** CART MO!", "ko": "그 **** 카트 치워!", "vi": "DẸP CÁI XE ĐẨY **** ĐI!", "ar": "حرّك عربتك ****!"}, "HEY!!": {"hi": "अरे!!", "pa": "ਓਏ!!", "zh": "喂！！", "fa": "هی!!", "es": "¡¡OYE!!", "tl": "HOY!!", "ko": "야!!", "vi": "NÀY!!", "ar": "هيه!!"}, "WATCH IT, ****!": {"hi": "देख के, ****!", "pa": "ਦੇਖ ਕੇ, ****!", "zh": "看着点，****！", "fa": "حواست باشه، ****!", "es": "¡CUIDADO, ****!", "tl": "TINGIN-TINGIN, ****!", "ko": "조심해, ****!", "vi": "COI CHỪNG, ****!", "ar": "انتبه، ****!"}, "MY HIP!": {"hi": "मेरा कूल्हा!", "pa": "ਮੇਰਾ ਚੂਲ੍ਹਾ!", "zh": "我的腰！", "fa": "لگنم!", "es": "¡MI CADERA!", "tl": "ANG BALAKANG KO!", "ko": "내 엉덩이!", "vi": "HÔNG TÔI!", "ar": "وركي!"}, "I HAVE A RECEIPT!": {"hi": "मेरे पास रसीद है!", "pa": "ਮੇਰੇ ਕੋਲ ਰਸੀਦ ਹੈ!", "zh": "我有小票！", "fa": "من رسید دارم!", "es": "¡TENGO EL RECIBO!", "tl": "MAY RESIBO AKO!", "ko": "나 영수증 있어!", "vi": "TÔI CÓ HÓA ĐƠN!", "ar": "عندي فاتورة!"}, "**** DRIVERS!": {"hi": "**** ड्राइवर!", "pa": "**** ਡਰਾਈਵਰ!", "zh": "****司机！", "fa": "راننده‌های ****!", "es": "¡**** CONDUCTORES!", "tl": "**** NA DRIVERS!", "ko": "**** 운전자들!", "vi": "**** TÀI XẾ!", "ar": "سائقون ****!"}, "I WILL SUE YOU": {"hi": "मैं तुम पर केस करूँगा!", "pa": "ਮੈਂ ਤੇਰੇ 'ਤੇ ਕੇਸ ਕਰੂੰ!", "zh": "我要告你！", "fa": "ازت شکایت می‌کنم!", "es": "¡TE VOY A DEMANDAR!", "tl": "IDEDEMANDA KITA!", "ko": "고소할 거야!", "vi": "TÔI SẼ KIỆN ANH!", "ar": "سأرفع عليك قضية!"}, "just waiting for my wife": {"hi": "बस बीवी का इंतज़ार कर रहा हूँ", "pa": "ਬੱਸ ਘਰਵਾਲੀ ਦੀ ਉਡੀਕ ਕਰ ਰਿਹਾਂ", "zh": "我就等我老婆", "fa": "فقط منتظر خانممم", "es": "solo espero a mi esposa", "tl": "hinihintay ko lang si misis", "ko": "와이프 기다리는 중이에요", "vi": "đang đợi vợ thôi", "ar": "أنتظر زوجتي فقط"}, "I'll be TWO minutes": {"hi": "बस दो मिनट!", "pa": "ਬੱਸ ਦੋ ਮਿੰਟ!", "zh": "就两分钟！", "fa": "فقط دو دقیقه!", "es": "¡son DOS minutos!", "tl": "DALAWANG minuto lang", "ko": "딱 2분이면 돼요", "vi": "HAI phút thôi mà", "ar": "دقيقتان فقط!"}, "hazards on, it's legal": {"hi": "हैज़र्ड चालू है, ये लीगल है", "pa": "ਹੈਜ਼ਰਡ ਚੱਲਦੇ ਨੇ, ਲੀਗਲ ਐ", "zh": "双闪开着呢，合法的", "fa": "فلاشر روشنه، قانونیه", "es": "con las intermitentes es legal", "tl": "naka-hazard, legal 'yan", "ko": "비상등 켰으니까 합법이죠", "vi": "bật đèn khẩn cấp là hợp pháp", "ar": "الغمّازات شغّالة، هذا قانوني"}, "go around, buddy": {"hi": "साइड से निकल जाओ, भाई", "pa": "ਪਾਸੇ ਦੀ ਲੰਘ ਜਾ, ਬਾਈ", "zh": "绕过去吧，哥们", "fa": "از بغل رد شو، رفیق", "es": "pasa por el lado, amigo", "tl": "umikot ka na lang, pare", "ko": "그냥 돌아가세요", "vi": "đi vòng đi, ông bạn", "ar": "لفّ من الجنب يا صاحبي"}, "she's grabbing a rotisserie": {"hi": "वो चिकन लेने गई है", "pa": "ਉਹ ਚਿਕਨ ਲੈਣ ਗਈ ਆ", "zh": "她去拿烤鸡了", "fa": "رفته مرغ بریون بگیره", "es": "ella fue por el pollo rostizado", "tl": "kumukuha siya ng lechon manok", "ko": "와이프가 치킨 사러 갔어요", "vi": "bà ấy đi lấy gà quay", "ar": "راحت تجيب الدجاج المشوي"}, "Attention members: a silver sedan is blocking lane 3.": {"hi": "सदस्यों, ध्यान दें: एक सिल्वर सेडान लेन 3 को ब्लॉक कर रही है।", "pa": "ਮੈਂਬਰੋ, ਧਿਆਨ ਦਿਓ: ਇੱਕ ਸਿਲਵਰ ਸੇਡਾਨ ਲੇਨ 3 ਰੋਕ ਰਹੀ ਹੈ।", "zh": "各位会员请注意：一辆银色轿车堵住了三号车道。", "fa": "توجه اعضا: یک سدان نقره‌ای مسیر ۳ را بسته است.", "es": "Atención socios: un sedán plateado está bloqueando el carril 3.", "tl": "Attention members: may silver na sedan na nakaharang sa lane 3.", "ko": "회원 여러분께 안내 말씀드립니다. 은색 세단이 3번 통로를 막고 있습니다.", "vi": "Kính báo quý hội viên: một chiếc sedan màu bạc đang chặn làn 3.", "ar": "انتباه للأعضاء: سيارة سيدان فضية تسدّ الممر 3."}, "Would the owner of the cart on the roof please come to the front.": {"hi": "छत पर रखी ट्रॉली का मालिक कृपया सामने आए।", "pa": "ਛੱਤ 'ਤੇ ਰੱਖੀ ਟਰਾਲੀ ਦਾ ਮਾਲਕ ਕਿਰਪਾ ਕਰਕੇ ਅੱਗੇ ਆਵੇ।", "zh": "请屋顶上那辆购物车的主人到前台来。", "fa": "صاحب چرخ دستیِ روی پشت‌بام لطفاً به جلوی فروشگاه بیاید.", "es": "El dueño del carrito en el techo, favor de pasar al frente.", "tl": "Sa may-ari ng cart na nasa bubong, pumunta po sa harap.", "ko": "지붕 위 카트 주인분은 앞으로 와 주세요.", "vi": "Chủ nhân chiếc xe đẩy trên mái nhà vui lòng lên phía trước.", "ar": "على صاحب العربة التي فوق السطح التوجّه إلى المقدمة."}, "Attention members: please do not fight in the parking lot.": {"hi": "सदस्यों, ध्यान दें: कृपया पार्किंग में झगड़ा न करें।", "pa": "ਮੈਂਬਰੋ, ਧਿਆਨ ਦਿਓ: ਪਾਰਕਿੰਗ ਵਿੱਚ ਲੜਾਈ ਨਾ ਕਰੋ।", "zh": "各位会员请注意：请不要在停车场打架。", "fa": "توجه اعضا: لطفاً در پارکینگ دعوا نکنید.", "es": "Atención socios: por favor no peleen en el estacionamiento.", "tl": "Attention members: huwag po mag-away sa parking lot.", "ko": "회원 여러분, 주차장에서 싸우지 마십시오.", "vi": "Kính báo quý hội viên: vui lòng không đánh nhau trong bãi đậu xe.", "ar": "انتباه للأعضاء: الرجاء عدم التشاجر في الموقف."}, "Hot dogs are still $1.50. Please calm down.": {"hi": "हॉट डॉग अब भी डेढ़ डॉलर का है। कृपया शांत रहें।", "pa": "ਹੌਟ ਡੌਗ ਹਾਲੇ ਵੀ ਡੇਢ ਡਾਲਰ ਦਾ ਹੈ। ਕਿਰਪਾ ਕਰਕੇ ਸ਼ਾਂਤ ਰਹੋ।", "zh": "热狗还是一块五。请大家冷静。", "fa": "هات‌داگ هنوز یک و نیم دلار است. لطفاً آرام باشید.", "es": "Los hot dogs siguen a $1.50. Por favor, cálmense.", "tl": "Hot dog ay $1.50 pa rin. Kumalma po kayo.", "ko": "핫도그는 여전히 1.5달러입니다. 진정하세요.", "vi": "Hot dog vẫn 1 đô rưỡi. Xin bình tĩnh.", "ar": "الهوت دوغ ما زال بدولار ونصف. الرجاء الهدوء."}, "Lane 2 is not a parking spot. Thank you.": {"hi": "लेन 2 पार्किंग की जगह नहीं है। धन्यवाद।", "pa": "ਲੇਨ 2 ਪਾਰਕਿੰਗ ਦੀ ਥਾਂ ਨਹੀਂ ਹੈ। ਧੰਨਵਾਦ।", "zh": "二号车道不是停车位。谢谢。", "fa": "مسیر ۲ جای پارک نیست. متشکریم.", "es": "El carril 2 no es un lugar de estacionamiento. Gracias.", "tl": "Ang lane 2 ay hindi parking space. Salamat.", "ko": "2번 통로는 주차 공간이 아닙니다. 감사합니다.", "vi": "Làn 2 không phải chỗ đậu xe. Cảm ơn.", "ar": "الممر 2 ليس موقف سيارات. شكراً."}, "Please return your carts. We can see you.": {"hi": "कृपया अपनी ट्रॉली वापस रखें। हम आपको देख रहे हैं।", "pa": "ਕਿਰਪਾ ਕਰਕੇ ਆਪਣੀਆਂ ਟਰਾਲੀਆਂ ਵਾਪਸ ਰੱਖੋ। ਅਸੀਂ ਤੁਹਾਨੂੰ ਦੇਖ ਰਹੇ ਹਾਂ।", "zh": "请归还购物车。我们看得见你。", "fa": "لطفاً چرخ‌های دستی را برگردانید. ما شما را می‌بینیم.", "es": "Por favor devuelvan sus carritos. Los estamos viendo.", "tl": "Ibalik po ang mga cart. Nakikita namin kayo.", "ko": "카트를 반납해 주세요. 다 보고 있습니다.", "vi": "Vui lòng trả xe đẩy. Chúng tôi thấy quý vị đấy.", "ar": "الرجاء إعادة العربات. نحن نراكم."}, "A child has lost their parents. The parents are fine with it.": {"hi": "एक बच्चे के माता-पिता खो गए हैं। माता-पिता को कोई आपत्ति नहीं है।", "pa": "ਇੱਕ ਬੱਚੇ ਦੇ ਮਾਪੇ ਗੁੰਮ ਹੋ ਗਏ ਹਨ। ਮਾਪਿਆਂ ਨੂੰ ਕੋਈ ਇਤਰਾਜ਼ ਨਹੀਂ।", "zh": "一名儿童走失了父母。父母表示没关系。", "fa": "کودکی والدینش را گم کرده است. والدین مشکلی ندارند.", "es": "Un niño perdió a sus padres. A los padres no les molesta.", "tl": "May batang nawalan ng magulang. Okay lang daw sa magulang.", "ko": "한 아이가 부모를 잃어버렸습니다. 부모님은 괜찮다고 하십니다.", "vi": "Một em bé bị lạc bố mẹ. Bố mẹ nói không sao.", "ar": "طفل أضاع والديه. الوالدان لا يمانعان."}, "REALLY? THAT SPOT?": {"hi": "सच में? वो वाली जगह?", "pa": "ਸੱਚੀਂ? ਉਹ ਥਾਂ?", "zh": "真的？那个车位？", "fa": "جدی؟ اون جا؟", "es": "¿EN SERIO? ¿ESE LUGAR?", "tl": "TALAGA? 'YANG PWESTO NA 'YAN?", "ko": "진짜? 거기에?", "vi": "THẬT À? CHỖ ĐÓ Á?", "ar": "جدّياً؟ هذا المكان؟"}, "MINE!": {"hi": "मेरी!", "pa": "ਮੇਰੀ!", "zh": "我的！", "fa": "مال منه!", "es": "¡MÍO!", "tl": "AKIN 'TO!", "ko": "내 거야!", "vi": "CỦA TÔI!", "ar": "لي!"}, "MOVE IT!!": {"hi": "हटो!!", "pa": "ਹਟ!!", "zh": "快走！！", "fa": "برو کنار!!", "es": "¡¡MUÉVETE!!", "tl": "USAD NA!!", "ko": "비켜!!", "vi": "ĐI ĐI!!", "ar": "تحرّك!!"}, "I'm waiting for this one": {"hi": "मैं इसी का इंतज़ार कर रहा हूँ", "pa": "ਮੈਂ ਇਸੇ ਦੀ ਉਡੀਕ ਕਰ ਰਿਹਾਂ", "zh": "这个位我等着呢", "fa": "من منتظر همینم", "es": "estoy esperando este", "tl": "hinihintay ko 'tong isang 'to", "ko": "이 자리 기다리는 중이에요", "vi": "tôi đang đợi chỗ này", "ar": "أنا أنتظر هذا المكان"}, "Welcome to Costco zero. Good luck.": {"hi": "कॉस्टको ज़ीरो में आपका स्वागत है। शुभकामनाएँ।", "pa": "ਕੌਸਟਕੋ ਜ਼ੀਰੋ ਵਿੱਚ ਜੀ ਆਇਆਂ ਨੂੰ। ਸ਼ੁਭਕਾਮਨਾਵਾਂ।", "zh": "欢迎光临 Costc0。祝你好运。", "fa": "به کاستکو صفر خوش آمدید. موفق باشید.", "es": "Bienvenidos a Costco cero. Buena suerte.", "tl": "Welcome sa Costco zero. Good luck.", "ko": "코스트코 제로에 오신 것을 환영합니다. 행운을 빕니다.", "vi": "Chào mừng đến Costco không. Chúc may mắn.", "ar": "أهلاً بكم في كوستكو زيرو. حظاً موفقاً."}};
+function pickLang() { let r = Math.random(); for (const [l, w] of LANGS) { r -= w; if (r <= 0) return l; } return 'en'; }
+function localize(text, lang) { if (!lang || lang === 'en') return text; const t = TR[text]; return t && t[lang] ? t[lang] : text; }
 
-  <script src="/assets/main.js" defer></script>
+// ---------- helpers (rand is swappable so a daily lot can be seeded) ----------
+let rand = Math.random;
+const rnd = (a, b) => a + rand() * (b - a);
+const pick = a => a[Math.floor(rand() * a.length)];
+const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
+const dist = (a, b) => Math.hypot(a.x - b.x, a.y - b.y);
+const angDiff = (a, b) => { let d = (b - a) % (Math.PI * 2); if (d > Math.PI) d -= Math.PI * 2; if (d < -Math.PI) d += Math.PI * 2; return d; };
+function mulberry(seed) { return () => { seed |= 0; seed = seed + 0x6D2B79F5 | 0; let t = Math.imul(seed ^ seed >>> 15, 1 | seed); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; }; }
+const todayKey = () => { const d = new Date(); return `${d.getFullYear()}${String(d.getMonth() + 1).padStart(2, '0')}${String(d.getDate()).padStart(2, '0')}`; };
+const $ = id => document.getElementById(id);
+
+// ---------- audio ----------
+let actx = null, muted = false, voices = true, lastSpoke = 0, engine = null;
+function ac() { try { actx = actx || new (window.AudioContext || window.webkitAudioContext)(); if (actx.state === 'suspended') actx.resume(); return actx; } catch (e) { return null; } }
+function beep(type, f0, f1, dur, vol) {
+  if (muted) return; const a = ac(); if (!a) return;
+  try { const o = a.createOscillator(), g = a.createGain(); o.type = type; o.frequency.setValueAtTime(f0, a.currentTime); o.frequency.exponentialRampToValueAtTime(f1, a.currentTime + dur);
+    g.gain.setValueAtTime(vol, a.currentTime); g.gain.exponentialRampToValueAtTime(0.001, a.currentTime + dur); o.connect(g); g.connect(a.destination); o.start(); o.stop(a.currentTime + dur); } catch (e) {}
+}
+const sfx = {
+  honk: () => { beep('square', 330, 300, 0.25, 0.08); beep('square', 415, 390, 0.25, 0.06); },
+  blast: () => { beep('square', 330, 320, 1.1, 0.1); beep('square', 415, 400, 1.1, 0.08); },
+  honk2: () => beep('square', 250, 240, 0.4, 0.05),
+  thud: () => beep('triangle', 120, 40, 0.18, 0.2),
+  thunk: () => { beep('triangle', 160, 70, 0.12, 0.15); setTimeout(() => beep('sine', 90, 60, 0.2, 0.1), 60); },
+  censor: () => beep('sine', 1000, 1000, 0.18, 0.09),
+  win: () => { beep('sine', 523, 784, 0.25, 0.1); setTimeout(() => beep('sine', 784, 1046, 0.3, 0.1), 180); },
+  lose: () => beep('sawtooth', 300, 80, 0.7, 0.1),
+  back: () => beep('square', 260, 250, 0.3, 0.05),
+  ding: () => beep('sine', 880, 660, 0.4, 0.06),
+  cash: () => { beep('square', 1200, 1200, 0.06, 0.05); setTimeout(() => beep('square', 1600, 1600, 0.1, 0.05), 80); },
+};
+function startEngine() {
+  const a = ac(); if (!a || engine) return;
+  try {
+    const o = a.createOscillator(), lp = a.createBiquadFilter(), g = a.createGain();
+    o.type = 'sawtooth'; o.frequency.value = 40; lp.type = 'lowpass'; lp.frequency.value = 320; g.gain.value = 0;
+    o.connect(lp); lp.connect(g); g.connect(a.destination); o.start();
+    const buf = a.createBuffer(1, a.sampleRate, a.sampleRate), d = buf.getChannelData(0); for (let i = 0; i < d.length; i++) d[i] = Math.random() * 2 - 1;
+    const n = a.createBufferSource(), bp = a.createBiquadFilter(), ng = a.createGain(); n.buffer = buf; n.loop = true; bp.type = 'bandpass'; bp.frequency.value = 2600; bp.Q.value = 2; ng.gain.value = 0;
+    n.connect(bp); bp.connect(ng); ng.connect(a.destination); n.start();
+    engine = { o, g, ng };
+  } catch (e) {}
+}
+function engineTick(speed, slip, on) {
+  if (!engine) return; const a = actx, t = a.currentTime;
+  const vol = (muted || !on) ? 0 : 0.035 + Math.min(0.05, Math.abs(speed) * 0.012);
+  engine.g.gain.setTargetAtTime(vol, t, 0.05); engine.o.frequency.setTargetAtTime(42 + Math.abs(speed) * 26 + (keys.up ? 10 : 0), t, 0.08);
+  engine.ng.gain.setTargetAtTime((muted || !on) ? 0 : Math.min(0.12, Math.max(0, slip - 0.9) * 0.12), t, 0.03);
+}
+const clips = new Map(); let clipsReady = false;
+fetch('voices/manifest.json').then(r => r.ok ? r.json() : []).then(list => { list.forEach(e => { if (e && e.text && e.file) clips.set((e.lang || 'en') + '|' + e.text, 'voices/' + e.file); }); clipsReady = clips.size > 0; }).catch(() => {});
+function playClip(text, angry, lang) {
+  const src = clips.get(lang + '|' + text) || clips.get('en|' + text); if (!src) return false;
+  try { const a = new Audio(src); a.volume = 0.95; a.playbackRate = angry ? 1 + Math.random() * 0.1 : 1; a.play().catch(() => {}); return true; } catch (e) { return false; }
+}
+let voiceCache = null;
+function voiceFor(lang) {
+  try { const vs = window.speechSynthesis.getVoices(); if (!vs.length) return null; voiceCache = voiceCache || {};
+    if (!voiceCache[lang]) { const want = TTS_LANG[lang].slice(0, 2); const m = vs.filter(v => v.lang && v.lang.toLowerCase().startsWith(want)); voiceCache[lang] = m.length ? m : null; }
+    return voiceCache[lang] ? voiceCache[lang][Math.floor(Math.random() * voiceCache[lang].length)] : null; } catch (e) { return null; }
+}
+function speak(text, angry, lang) {
+  if (!voices || muted) return; lang = lang || 'en';
+  const now = performance.now(); if (now - lastSpoke < 1400) return; lastSpoke = now;
+  if (clipsReady && playClip(text, angry, lang)) return;
+  const v = voiceFor(lang); if (lang !== 'en' && !v) lang = 'en'; text = localize(text, lang);
+  try { const synth = window.speechSynthesis; if (!synth) return; if (text.includes('****')) sfx.censor();
+    const u = new SpeechSynthesisUtterance(text.replace(/\*\*\*\*/g, ' bleep ').toLowerCase()); u.rate = angry ? 1.2 : 1; u.pitch = angry ? 0.8 + Math.random() * 0.6 : 1; u.volume = 0.9; u.lang = TTS_LANG[lang]; const vv = voiceFor(lang); if (vv) u.voice = vv; synth.speak(u); } catch (e) {}
+}
+
+// ---------- state ----------
+const S = { running: false, round: 1, score: 0, best: 0, patience: 100, t: 0, hits: 0, peds: 0, sniped: 0, honks: [], stole: 0, rep: 0, carts: 0, honkTotal: 0, blinkUsed: false, argued: 0, unlocked: 1, vehicle: 'sedan', mode: 'daily', seed: 0, event: EVENTS[0], outcome: '', log: [], missions: [], crossed: 0, argueWins: 0, honksRound: 0, idlerGone: false, vulturesBeaten: 0, missionsDone: 0, career: {} };
+try { S.career = JSON.parse(localStorage.getItem('loc-career') || '{}'); } catch (e) {}
+try { S.best = +localStorage.getItem('loc-best') || 0; S.unlocked = +localStorage.getItem('loc-unlocked') || 1; } catch (e) {}
+let spots = [], cars = [], peds = [], carts = [], fights = [], bubbles = [], player, cam = { x: 600, y: 1200 };
+let parkTimer = 0, leaveTimer = 0, paTimer = 12, spawnTimer = 0, doom = null, doomT = 0, sparks = [], vultureCd = 4, skids = [], rainT = 0, argue = null, lastTheft = null, walker = null, footT = 0;
+const keys = { up: 0, down: 0, left: 0, right: 0, honk: 0, blink: 0, out: 0 };
+const V = () => VEHICLES[S.vehicle];
+
+// ---------- lot ----------
+function makeLot(round) {
+  const seeded = S.mode === 'daily'; rand = seeded ? mulberry(S.seed * 31 + round * 7919) : Math.random;
+  spots = []; cars = []; peds = []; carts = []; fights = []; bubbles = []; skids = []; sparks = []; lastTheft = null; argue = null;
+  S.event = round === 1 ? EVENTS[0] : EVENTS[seeded ? 1 + Math.floor(rand() * 5) : 1 + ((round - 2) % 5)];
+  const ev = S.event.id;
+  BLOCK_Y.forEach((by, b) => { COLS.forEach(cx => {
+    spots.push({ x: cx + SPOT_W / 2, y: by + SPOT_L / 2, block: b, lane: LANE_Y[b], state: 'car', face: -1 });
+    spots.push({ x: cx + SPOT_W / 2, y: by + SPOT_L * 1.5, block: b, lane: LANE_Y[b + 1], state: 'car', face: 1 }); }); });
+  spots.forEach(s => { s.color = pick(CAR_COLORS); });
+  spots.filter(s => s.block === 0 && s.face === -1 && Math.abs(s.x - CROSS_X) < 180).forEach(s => { s.access = true; s.state = 'free'; });
+  const acc = spots.filter(s => s.access);
+  for (let i = 0; i < Math.min(acc.length, 1 + Math.floor(round / 2)); i++) { const s = pick(acc); if (s.state === 'free') { s.state = 'car'; s.illegal = true; s.color = pick(['#262a33', '#f4f4f2']); } }
+  const nFree = Math.max(2, 7 - round - (ev === 'blackfriday' ? 1 : 0)); let tries = 0;
+  while (spots.filter(s => s.state === 'free' && !s.access).length < nFree && tries++ < 800) { const s = pick(spots); if (s.state !== 'car' || s.access) continue; if (rand() > (s.y / H) * 1.15) continue; s.state = 'free'; }
+  // a pickup needs two free spots side by side: make sure at least one pair exists
+  if (S.vehicle === 'pickup') { const fr = spots.filter(s => s.state === 'free' && !s.access); const s = fr[fr.length - 1]; const n = spots.find(q => q.face === s.face && q.y === s.y && Math.abs(q.x - s.x) === SPOT_W && q.state === 'car'); if (n) n.state = 'free'; }
+  spots.filter(s => s.state === 'car' && !s.access).sort(() => rand() - 0.5).slice(0, 5 + round * 2).forEach(s => { s.state = 'cart'; carts.push({ x: s.x + rnd(-8, 8), y: s.y + rnd(-20, 20), vx: 0, vy: 0, a: rnd(0, 6.28), va: 0 }); });
+  for (let i = 0; i < 3 + round; i++) {
+    const idx = Math.floor(rand() * (spots.length - 2)), a = spots[idx], b = spots[idx + 2];
+    if (!a || !b || a.state !== 'car' || b.state !== 'car' || a.access || b.access || a.face !== b.face || Math.abs(a.x - b.x) !== SPOT_W) continue;
+    a.state = 'double'; b.state = 'tight'; b.tightOf = a; a.tilt = rnd(0.12, 0.22) * (rand() < 0.5 ? 1 : -1);
+  }
+  for (let i = 0; i < 4 + round * 2; i++) carts.push({ x: rnd(100, 1100), y: pick(LANE_Y) + rnd(-30, 30), vx: rnd(-0.3, 0.3), vy: rnd(-0.15, 0.15), a: rnd(0, 6.28), va: 0 });
+  for (let i = 0; i < 1 + Math.floor(round / 2); i++) { const s = pick(spots.filter(q => q.state === 'car' && !q.access && Math.abs(q.x - CROSS_X) > 120)); if (!s) continue; const c = newCar(s.x, s.lane + (s.face === -1 ? -26 : 26), Math.PI / 2, s.block); c.mode = 'hazard'; c.hazT = rnd(8, 20); cars.push(c); }
+  // the boss shopper: idles in the lane right in front of a free spot
+  if (round >= 2) { const fr = spots.filter(s => s.state === 'free' && !s.access); const s = pick(fr); if (s) { const c = newCar(s.x, s.lane, s.face === -1 ? -Math.PI / 2 : Math.PI / 2, s.block); c.mode = 'boss'; c.hazT = 26; c.color = '#262a33'; c.spotRef = s; cars.push(c); } }
+  const nCruise = 3 + round + (ev === 'blackfriday' ? 3 : 0);
+  for (let i = 0; i < nCruise; i++) { const b = Math.floor(rand() * 4), wp = loopFor(b), k = Math.floor(rand() * 4); const c = newCar(wp[k].x + rnd(-100, 100), wp[k].y, 0, b); c.wi = (k + 1) % 4; c.a = Math.atan2(c.wp[c.wi].x - c.x, -(c.wp[c.wi].y - c.y)); c.circleT = rnd(8, 25); cars.push(c); }
+  if (ev === 'gas') for (let i = 0; i < 7; i++) { const c = newCar(RIGHT_X - 6, LANE_Y[4] - 40 - i * 72, 0, 3); c.mode = 'queue'; c.color = pick(CAR_COLORS); c.wait = rnd(0, 6); cars.push(c); }
+  for (let i = 0; i < 8 + round * 2; i++) spawnPed();
+  for (let i = 0; i < 1 + Math.floor(round / 2); i++) { const f = { lang: pickLang(), x: rnd(150, 1050), y: pick(LANE_Y) + rnd(-20, 20), t: rnd(0, 2), turn: 0 }; if (Math.abs(f.x - CROSS_X) < 80) f.x += 160; fights.push(f); }
+  if (ev === 'samples') for (let i = 0; i < 4; i++) { fights.push({ lang: pickLang(), x: rnd(150, 1050), y: LANE_Y[1 + i % 3] + rnd(-10, 10), t: rnd(1, 3), turn: 0, crowd: true }); }
+  const v = V(); player = { x: ENTRY.x, y: ENTRY.y, a: 0, vx: 0, vy: 0, w: v.w, l: v.l, bump: 0, honkCd: 0, speed: 0, blink: false, honkHold: 0, blasted: false, dingCd: 0 };
+  walker = null; footT = 0; cam.x = player.x; cam.y = player.y; parkTimer = 0; leaveTimer = 3; paTimer = 8; spawnTimer = 6; vultureCd = 4; doom = null; doomT = 0;
+  chooseMissions();
+  rand = Math.random;
+}
+function loopFor(block) { return [{ x: LEFT_X, y: LANE_Y[block] }, { x: RIGHT_X, y: LANE_Y[block] }, { x: RIGHT_X, y: LANE_Y[block + 1] }, { x: LEFT_X, y: LANE_Y[block + 1] }]; }
+function newCar(x, y, a, block) { return { lang: pickLang(), x, y, a, v: 0, w: 36, l: 64, wp: loopFor(block), wi: 0, block, color: pick(CAR_COLORS), mode: 'cruise', wait: 0, spot: null, cd: 0, circleT: 15, blink: 0, rage: 0, rageT: 0 }; }
+function spawnPed(fromStore) {
+  const s = pick(spots.filter(q => !q.access)), inbound = fromStore === undefined ? Math.random() < 0.5 : !fromStore, laneY = s.lane, doorY = 128;
+  const path = inbound ? [{ x: s.x, y: laneY }, { x: CROSS_X + rnd(-20, 20), y: laneY }, { x: CROSS_X + rnd(-20, 20), y: doorY }] : [{ x: CROSS_X + rnd(-20, 20), y: laneY }, { x: s.x, y: laneY }, { x: s.x, y: s.y }];
+  const start = inbound ? { x: s.x, y: s.y + (s.face === -1 ? -50 : 50) } : { x: CROSS_X + rnd(-20, 20), y: doorY };
+  peds.push({ lang: pickLang(), x: start.x, y: start.y, path, pi: 0, cart: Math.random() < 0.6, speed: rnd(0.6, 1.1) * (S.event.id === 'rain' ? 1.5 : 1), stop: 0, hurry: 0, vx: 0, vy: 0, skin: pick(['#f1c27d', '#e0ac69', '#8d5524', '#c68642', '#ffdbac']), shirt: pick(CAR_COLORS), phoneT: rnd(3, 9), flung: 0 });
+}
+function say(e, text, dur, bad) { const lang = e.lang || 'en', shown = localize(text, lang); bubbles.push({ e, text: shown, t: dur || 1.6, bad, rtl: lang === 'fa' || lang === 'ar' }); if (player && dist(e, player) < 380) speak(text, bad, lang); }
+function toast(text, cls) { const f = $('feed'), d = document.createElement('div'); d.textContent = text; d.dir = 'auto'; if (cls) d.className = cls; f.appendChild(d); while (f.children.length > 3) f.removeChild(f.firstChild); setTimeout(() => { if (d.parentNode) d.parentNode.removeChild(d); }, 2600); }
+function hurt(n, why, cls) { S.patience = clamp(S.patience - n, 0, 100); if (why) toast(`${why}  ${n > 0 ? '-' : '+'}${Math.abs(n)}`, cls || (n > 0 ? 'bad' : 'good')); }
+function rep(n, why) { S.rep = clamp(S.rep + n, -100, 100); if (why) toast(`${why}  rep ${n > 0 ? '+' : ''}${n}`, n > 0 ? 'good' : 'bad'); }
+function brawl(x, y) { fights.push({ lang: pickLang(), x, y, t: 0.2, turn: 1, life: rnd(10, 18) }); toast('A fight broke out over a spot', 'bad'); }
+function ding(why) {
+  S.hits++; sfx.thud(); player.bump = 0.3; hurt(6, `${why} (${Math.min(S.hits, 3)}/3)`); rep(-4);
+  if (S.hits >= 3 && !doom) { doom = 'fire'; doomT = 2.4; toast('Your car is on fire', 'bad'); sfx.lose(); say(player, 'oh no no no no', 2, true); }
+}
+function sued(q) { if (doom) return; doom = 'sued'; doomT = 2.2; toast('You hit a shopper. Lawyers are already here.', 'bad'); say(q, 'I WILL SUE YOU', 2.2, true); sfx.lose(); }
+// ---------- missions ----------
+const MISSIONS = [
+  { id: 'carts2', text: 'Return 2 carts', live: () => S.carts >= 2, reward: 300 },
+  { id: 'cart1', text: 'Return a cart before you park', live: () => S.carts >= 1, reward: 150 },
+  { id: 'nohonk', text: 'Park without honking', park: () => S.honksRound === 0, reward: 250 },
+  { id: 'fast', text: 'Park within 45 seconds', park: () => S.t <= 45, reward: 300 },
+  { id: 'clean', text: 'Park with zero dings', park: () => S.hits === 0, reward: 200 },
+  { id: 'blinker', text: 'Park with your blinker on', park: () => player.blink, reward: 200 },
+  { id: 'argue', text: 'Win an argument for a spot', live: () => S.argueWins >= 1, reward: 400 },
+  { id: 'cross', text: 'Let 2 shoppers cross while you wait', live: () => S.crossed >= 2, reward: 200 },
+  { id: 'idler', text: 'Honk the idler out of the lane', live: () => S.idlerGone, reward: 250, need: () => S.round >= 2 },
+  { id: 'far', text: 'Park in the back half of the lot', park: s => s.y > 850, reward: 150 },
+  { id: 'front', text: 'Park in the front two rows', park: s => s.y < 500, reward: 350 },
+  { id: 'tight', text: 'Squeeze into a tight gap', park: s => !!s.tightOf, reward: 400, need: () => S.vehicle === 'hatch' },
+  { id: 'vulture', text: 'Beat a spot vulture to the spot', live: () => S.vulturesBeaten >= 1, reward: 400 },
+  { id: 'patient', text: 'Park with over 60% patience left', park: () => S.patience > 60, reward: 250 },
+  { id: 'nosteal', text: 'Take nobody\'s spot', park: s => !cars.some(o => o.mode === 'wait' && o.spot === s), reward: 150 },
+];
+const CAREER = [
+  { id: 'rounds', text: 'Reach round 5', target: 5, get: c => c.roundsMax || 0 },
+  { id: 'carts', text: 'Return 10 carts in total', target: 10, get: c => c.carts || 0 },
+  { id: 'argue', text: 'Win 3 arguments', target: 3, get: c => c.argueWins || 0 },
+  { id: 'missions', text: 'Complete 10 missions', target: 10, get: c => c.missions || 0 },
+  { id: 'vehicles', text: 'Park every vehicle', target: 4, get: c => (c.vehicles || []).length },
+  { id: 'saint', text: 'Earn the Saint of Lane 3 title', target: 1, get: c => c.saint || 0 },
+  { id: 'fire', text: 'Set your car on fire (we know you will)', target: 1, get: c => c.fire || 0 },
+  { id: 'sued', text: 'Get sued', target: 1, get: c => c.sued || 0 },
+  { id: 'score', text: 'Score 5,000 in one game', target: 1, get: c => (c.bestGame || 0) >= 5000 ? 1 : 0 },
+];
+function career(k, v, max) { S.career[k] = max ? Math.max(S.career[k] || 0, v) : (S.career[k] || 0) + v; try { localStorage.setItem('loc-career', JSON.stringify(S.career)); } catch (e) {} }
+function careerSet(k, item) { const a = S.career[k] || []; if (!a.includes(item)) { a.push(item); S.career[k] = a; try { localStorage.setItem('loc-career', JSON.stringify(S.career)); } catch (e) {} } }
+function chooseMissions() {
+  const pool = MISSIONS.filter(m => !m.need || m.need()); const out = [];
+  while (out.length < 2 && pool.length) { const m = pool.splice(Math.floor(rand() * pool.length), 1)[0]; if (m.id === 'far' && out.some(o => o.id === 'front')) continue; if (m.id === 'front' && out.some(o => o.id === 'far')) continue; out.push({ ...m, done: false }); }
+  S.missions = out; renderMissions();
+}
+function renderMissions() { const el = $('missions'); if (!S.missions.length || !S.running) { el.hidden = true; return; } el.hidden = false; el.innerHTML = '<span class="ttl">Missions</span>' + S.missions.map(m => `<div class="m ${m.done ? 'done' : ''}"><b>${m.done ? '✓' : ''}</b><span>${m.text}<small>+${m.reward}</small></span></div>`).join(''); }
+function missionTick() { for (const m of S.missions) if (!m.done && m.live && m.live()) completeMission(m); }
+function completeMission(m) { m.done = true; S.score += m.reward; S.missionsDone++; career('missions', 1); hurt(-8, `MISSION COMPLETE: ${m.text}`, 'good'); sfx.cash(); renderMissions(); }
+const repMul = () => S.rep > 30 ? 0.5 : S.rep < -30 ? 1.6 : 1;   // good reputation: fewer people cut you off
+
+// ---------- physics ----------
+function carCircles(c) { const dx = Math.sin(c.a), dy = -Math.cos(c.a), r = c.w / 2 + 1, n = Math.max(3, Math.round(c.l / 22)); const out = []; for (let i = 0; i < n; i++) { const o = -c.l / 2 + c.w / 2 + i * (c.l - c.w) / (n - 1); out.push({ x: c.x + dx * o, y: c.y + dy * o, r }); } return out; }
+function spotRect(s) { return { x: s.x - SPOT_W / 2 + 4, y: s.y - SPOT_L / 2 + 6, w: SPOT_W - 8, h: SPOT_L - 12 }; }
+function circleRect(p, r, rc) { const cx = clamp(p.x, rc.x, rc.x + rc.w), cy = clamp(p.y, rc.y, rc.y + rc.h), dx = p.x - cx, dy = p.y - cy, d = Math.hypot(dx, dy); if (d >= r) return null; if (d === 0) return { x: 0, y: -1, pen: r }; return { x: dx / d, y: dy / d, pen: r - d }; }
+function staticRects(circ) {
+  const out = [];
+  for (const s of spots) {
+    if (s.state === 'free' || s.state === 'tight' || s.state === 'cart' || s.state === 'leaving') continue;
+    if (Math.abs(s.x - circ.x) > 70 || Math.abs(s.y - circ.y) > 80) continue;
+    out.push(s.state === 'double' ? { x: s.x - SPOT_W / 2 + 2, y: s.y - SPOT_L / 2 + 4, w: 62, h: SPOT_L - 10 } : spotRect(s));
+  }
+  for (const k of CORRALS) if (Math.abs(k.x + k.w / 2 - circ.x) < 90 && Math.abs(k.y + k.h / 2 - circ.y) < 120) out.push(k);
+  return out;
+}
+function resolveStatic(c, isPlayer) {
+  let hitN = null;
+  for (const circ of carCircles(c)) {
+    if (circ.x < circ.r) { c.x += circ.r - circ.x; hitN = { x: 1, y: 0 }; }
+    if (circ.x > W - circ.r) { c.x -= circ.x - (W - circ.r); hitN = { x: -1, y: 0 }; }
+    if (circ.y < STORE_Y + circ.r) { c.y += STORE_Y + circ.r - circ.y; hitN = { x: 0, y: 1 }; }
+    if (circ.y > H - circ.r) { c.y -= circ.y - (H - circ.r); hitN = { x: 0, y: -1 }; }
+    for (const rc of staticRects(circ)) { const n = circleRect(circ, circ.r, rc); if (n) { c.x += n.x * n.pen; c.y += n.y * n.pen; hitN = n; } }
+  }
+  if (hitN && isPlayer) { const vn = c.vx * hitN.x + c.vy * hitN.y; if (vn < 0) { c.vx -= vn * 1.5 * hitN.x; c.vy -= vn * 1.5 * hitN.y; } if (Math.abs(vn) > 1.3 && !c.dingCd) { c.dingCd = 0.8; ding(pick(['Scraped a parked car', 'Bumper tag', 'That left a mark', 'Someone is writing down your plate'])); } }
+  else if (hitN) c.v *= 0.4;
+  return !!hitN;
+}
+function carVsCar(a, b) { const A = carCircles(a), B = carCircles(b); let n = null; for (const p of A) for (const q of B) { const d = Math.hypot(p.x - q.x, p.y - q.y), m = p.r + q.r; if (d < m && d > 0) { const nx = (p.x - q.x) / d, ny = (p.y - q.y) / d, pen = (m - d) / 2; a.x += nx * pen; a.y += ny * pen; b.x -= nx * pen; b.y -= ny * pen; n = { x: nx, y: ny }; } } return n; }
+const inRect = (p, r) => p.x > r.x && p.x < r.x + r.w && p.y > r.y && p.y < r.y + r.h;
+
+// ---------- update ----------
+function update(dt) {
+  S.t += dt; const r = S.round, p = player, ev = S.event.id;
+  p.dingCd = Math.max(0, p.dingCd - dt);
+  if (doom) {
+    doomT -= dt; keys.up = keys.down = keys.left = keys.right = 0;
+    if (doom === 'fire') for (let i = 0; i < 3; i++) sparks.push({ x: p.x + rnd(-14, 14), y: p.y + rnd(-26, 26), vx: rnd(-0.4, 0.4), vy: rnd(-1.6, -0.6), t: rnd(0.4, 0.9), r: rnd(5, 12) });
+    for (let i = sparks.length - 1; i >= 0; i--) { const k = sparks[i]; k.t -= dt; k.x += k.vx; k.y += k.vy; if (k.t <= 0) sparks.splice(i, 1); }
+    if (doomT <= 0) return gameOver(doom);
+  }
+  // --- argument mini-game: the car is parked, you are out of it, shouting ---
+  if (argue) {
+    argue.t -= dt; argue.them += dt * (0.22 + 0.04 * r) * (argue.boss ? 1.3 : 1);
+    if (keys.honk && !argue.held) { argue.me += 0.075; argue.held = true; } if (!keys.honk) argue.held = false;
+    $('argueMe').style.width = `${Math.min(100, argue.me * 100)}%`; $('argueThem').style.width = `${Math.min(100, argue.them * 100)}%`;
+    if (argue.me >= 1 || argue.them >= 1 || argue.t <= 0) {
+      const win = argue.me > argue.them; $('argue').hidden = true;
+      const s = argue.spot; S.argued++;
+      if (win) { S.argueWins++; career('argueWins', 1); const c = newCar(s.x, s.y, s.face === -1 ? Math.PI : 0, s.block); c.color = s.color; c.mode = 'leave'; c.leaveT = 1.8; c.spotRef = s; c.lang = argue.lang; s.state = 'leaving'; say(c, 'FINE. TAKE IT.', 1.8, true); hurt(-10, 'You won the argument'); rep(-3); sfx.win(); }
+      else { brawl(p.x + 40, p.y); hurt(15, 'You lost the argument'); rep(-10); toast('Manager: both of you, out of my lot.', 'pa'); say({ x: s.x, y: s.y, lang: argue.lang }, pick(INSULTS), 2, true); }
+      argue = null;
+    }
+    keys.up = keys.down = keys.left = keys.right = 0;
+  }
+  // --- on foot: arrows walk, the car stays where you left it ---
+  if (walker && !argue && !doom) {
+    footT += dt; const w = walker, sp = 2.4 * dt * 60 * (S.event.id === 'rain' ? 1.2 : 1);
+    const mx = (keys.right ? 1 : 0) - (keys.left ? 1 : 0), my = (keys.down ? 1 : 0) - (keys.up ? 1 : 0), ml = Math.hypot(mx, my) || 1;
+    w.x = clamp(w.x + mx / ml * sp, 14, W - 14); w.y = clamp(w.y + my / ml * sp, STORE_Y + 14, H - 14);
+    for (const rc of staticRects(w)) { const n = circleRect(w, 10, rc); if (n) { w.x += n.x * n.pen; w.y += n.y * n.pen; } }
+    for (const k of carts) { const d = dist(w, k), m = 24; if (d < m && d > 0) { const nx = (k.x - w.x) / d, ny = (k.y - w.y) / d; k.vx += nx * 1.2; k.vy += ny * 1.2; k.va = rnd(-3, 3); k.x += nx * (m - d) * 0.5; k.y += ny * (m - d) * 0.5; } }
+    for (const c of cars) { const d = dist(w, c); if (d < 30 && (c.fast || Math.abs(c.v) > 1.4) && !c.hitW) { c.hitW = 1.5; hurt(12, 'Clipped by a car. You are a pedestrian now.'); say(w, pick(PED_HIT), 1.6, true); say(c, pick(['GET OUT OF THE LANE', 'WALK MUCH?']), 1.4, true); w.x += (w.x - c.x) / (d || 1) * 30; w.y += (w.y - c.y) / (d || 1) * 30; } c.hitW = Math.max(0, (c.hitW || 0) - dt); }
+    if (keys.honk && !p.honkCd) { p.honkCd = 0.8; say(w, pick(['HEY!', 'I\'M WALKING HERE', 'WATCH IT!']), 1.3, true); peds.forEach(q => { if (dist(q, w) < 120) q.hurry = 1.5; }); cars.forEach(c => { if (dist(c, w) < 160 && Math.random() < 0.5) say(c, pick(['GET IN YOUR CAR', 'YOU LEFT IT THERE?!', 'IS THAT YOUR CAR?']), 1.4, true); }); }
+    p.honkCd = Math.max(0, p.honkCd - dt);
+    const carParked = spots.some(q => (q.state === 'free' || q.state === 'tight') && Math.abs(p.x - q.x) < 20 && Math.abs(p.y - q.y) < 24);
+    if (!carParked && footT > 20 && !doom) { doom = 'towed'; doomT = 2.6; toast('A tow truck is hooking up your car', 'bad'); sfx.lose(); say(w, 'NO NO NO WAIT', 2, true); }
+    else if (!carParked && footT > 12 && !p.towWarn) { p.towWarn = true; toast('Your car is blocking the lane. Tow truck in 8 seconds.', 'bad'); }
+    S.patience -= dt * 0.6;
+    cam.x += (w.x - cam.x) * Math.min(1, dt * 5); cam.y += (w.y - cam.y) * Math.min(1, dt * 5);
+  } else { footT = 0; p.towWarn = false; }
+  const onFoot = !!walker;
+  // --- player: bicycle-ish model with lateral grip (less of it in the rain) ---
+  const veh = V(), fx = Math.sin(p.a), fy = -Math.cos(p.a), fwd = p.vx * fx + p.vy * fy, lat = p.vx * -fy + p.vy * fx;
+  let acc = 0; if (!onFoot) { if (keys.up) acc = 9; else if (keys.down) acc = fwd > 0.3 ? -14 : -6; }
+  let nf = fwd + acc * dt; nf *= Math.pow(0.985, dt * 60); if (!keys.up && !keys.down && Math.abs(nf) < 0.05) nf = 0; nf = clamp(nf, -2.6, veh.top);
+  const grip = (Math.abs(nf) > 4.2 ? 0.86 : 0.7) + (ev === 'rain' ? 0.08 : 0), nl = lat * Math.pow(grip, dt * 60);
+  p.vx = fx * nf + -fy * nl; p.vy = fy * nf + fx * nl;
+  const steer = onFoot ? 0 : (keys.right ? 1 : 0) - (keys.left ? 1 : 0);
+  p.a += steer * veh.steer * dt * clamp(nf / 2.2, -1, 1) * (1 - Math.min(0.45, Math.abs(nf) / 14));
+  p.x += p.vx * dt * 60; p.y += p.vy * dt * 60; p.speed = nf; p.bump = Math.max(0, p.bump - dt);
+  if (Math.abs(nl) > 1.1 && Math.random() < dt * 25) skids.push({ x: p.x + rnd(-10, 10), y: p.y + rnd(-14, 14), t: 4 });
+  engineTick(nf, Math.abs(nl), S.running && !argue && !onFoot);
+  resolveStatic(p, true);
+  // --- blinker ---
+  if (keys.blink && !p.blinkHeld && !onFoot) { p.blink = !p.blink; p.blinkHeld = true; if (p.blink) { S.blinkUsed = true; toast('Blinker on. Honest people will respect it. Honest people.', 'good'); } } if (!keys.blink) p.blinkHeld = false;
+  // --- honk: tap, or hold for a long blast ---
+  if (keys.honk && !argue && !onFoot) {
+    p.honkHold += dt;
+    if (!p.honkCd && p.honkHold < 0.05) {
+      p.honkCd = 0.5; sfx.honk(); S.honks.push(S.t); S.honks = S.honks.filter(t => S.t - t < 5); S.honkTotal++; S.honksRound++;
+      peds.forEach(q => { if (dist(q, p) < 170) { q.hurry = 2.5; if (Math.random() < 0.3) say(q, pick(['OK OK!', 'I\'M WALKING HERE', 'relax, ****']), 1.3, true); } });
+      cars.forEach(c => { if (dist(c, p) < 220) { c.rage++; c.rageT = 10; if (c.mode === 'boss') { c.hazT -= 6; c.honked = true; say(c, c.hazT > 6 ? pick(['I HEARD YOU', 'ENGINE\'S WARMING UP', 'RELAX, I\'M LEAVING']) : 'ALRIGHT, ALRIGHT', 1.5, true); }
+        else if (Math.random() < 0.75) say(c, c.mode === 'hazard' ? pick(HAZARD) : pick(['HONK YOURSELF', 'BEEP BEEP ****', 'RELAX!!', 'WHAT?!']), 1.5, true);
+        if (c.rage >= 2 && c.mode === 'cruise') { c.mode = 'stalk'; c.stalkT = 12; say(c, 'OH, YOU WANT TO PLAY?', 1.8, true); toast('You honked at the wrong person. They\'re following you.', 'bad'); } } });
+      fights.forEach(f => { if (dist(f, p) < 200) { f.turn = 2; say(f, f.crowd ? 'shh, they\'re cutting the cheese' : pick(['MIND YOUR **** BUSINESS', 'YOU WANT SOME TOO?', 'WE\'RE BUSY']), 1.8, true); } });
+      if (S.honks.length >= 5) { S.honks = []; hurt(5, 'Honking like a maniac'); rep(-6); }
+    }
+    if (p.honkHold > 0.9 && !p.blasted) {
+      p.blasted = true; sfx.blast(); S.honkTotal += 3;
+      peds.forEach(q => { if (dist(q, p) < 260) q.hurry = 3.5; });
+      for (let i = fights.length - 1; i >= 0; i--) if (dist(fights[i], p) < 240) { say(fights[i], fights[i].crowd ? 'ok, ok, we\'re moving' : 'FINE!', 1.5, true); fights.splice(i, 1); }
+      cars.forEach(c => { if (dist(c, p) < 260) { c.rage++; c.rageT = 10; say(c, pick(INSULTS), 1.6, true); } });
+      hurt(8, 'Long blast. The crowd moved. Everyone hates you.'); rep(-8);
+    }
+  } else { p.honkHold = 0; p.blasted = false; }
+  p.honkCd = Math.max(0, p.honkCd - dt);
+  // --- get out of the car and argue ---
+  if (keys.out && !p.outHeld && !argue && !doom) {
+    p.outHeld = true;
+    const me = walker || p, theft = lastTheft && S.t - lastTheft.t < 12 && dist(me, lastTheft.spot) < 170 ? lastTheft : null;
+    const startArgue = who => { argue = { spot: theft.spot, lang: theft.lang, me: 0, them: 0, t: 6, boss: theft.fast }; $('argue').hidden = false; $('argueMe').style.width = '0%'; $('argueThem').style.width = '0%'; $('argueTitle').textContent = theft.fast ? 'Argue with the vulture!' : 'Argue for your spot!'; say(who, 'HEY! THAT WAS MINE!', 1.5, true); };
+    if (walker) {
+      if (dist(walker, p) < 56) { walker = null; toast('Back in the car', 'good'); sfx.thunk(); }
+      else if (theft) startArgue(walker);
+      else toast('Walk back to your car and press E to get in', 'pa');
+    } else if (Math.abs(p.speed) < 3) {
+      if (theft) startArgue(p);
+      else { walker = { x: p.x - Math.cos(p.a) * 30, y: p.y - Math.sin(p.a) * 30, lang: 'en', hurry: 0 }; p.vx = p.vy = 0; footT = 0; toast('You got out. Arrows walk, E gets back in. Don\'t leave the car in the lane too long.', 'pa'); }
+    } else toast('Slow down first', 'pa');
+  } if (!keys.out) p.outHeld = false;
+  S.patience -= dt * 1.0 * (1 + 0.15 * r);
+  // --- parked? ---
+  let inSpot = null;
+  for (const s of spots) {
+    if (s.state === 'free' && Math.abs(p.x - s.x) < 14 && Math.abs(p.y - s.y) < 20) inSpot = s;
+    if (s.state === 'tight' && veh.w <= 26 && Math.abs(p.x - (s.x + 11)) < 7 && Math.abs(p.y - s.y) < 20) inSpot = s;
+  }
+  if (inSpot && S.vehicle === 'pickup') { const n = spots.find(q => q !== inSpot && q.face === inSpot.face && q.y === inSpot.y && Math.abs(q.x - inSpot.x) === SPOT_W && q.state === 'free'); if (!n) { if (!p.pickupWarn || S.t - p.pickupWarn > 4) { p.pickupWarn = S.t; toast('The trailer needs two spots side by side', 'pa'); } inSpot = null; } else inSpot.pair = n; }
+  const straight = Math.abs(Math.sin(p.a)) < 0.35;
+  if (!doom && !argue && !onFoot && inSpot && straight && Math.abs(p.speed) < 0.25 && Math.abs(nl) < 0.2) { parkTimer += dt; if (parkTimer > 0.8) return finishRound(inSpot); } else parkTimer = 0;
+  // --- PA ---
+  paTimer -= dt; if (paTimer < 0) { paTimer = rnd(14, 24); const line = pick(PA), pl = Math.random() < 0.6 ? 'en' : pickLang(); toast(`PA: ${localize(line, pl)}`, 'pa'); sfx.ding(); if (voices && !muted) { lastSpoke = 0; speak(line, false, pl); } }
+  if (ev === 'rain') rainT += dt;
+  // --- carts ---
+  for (let i = carts.length - 1; i >= 0; i--) {
+    const k = carts[i];
+    for (const c of cars) if (c.fast && dist(c, k) < 30) { const d = dist(c, k) || 1; k.vx = (k.x - c.x) / d * 4; k.vy = (k.y - c.y) / d * 4; k.va = rnd(-6, 6); }
+    k.x += k.vx * dt * 60; k.y += k.vy * dt * 60; k.a += k.va * dt; k.vx *= Math.pow(0.985, dt * 60); k.vy *= Math.pow(0.985, dt * 60); k.va *= 0.97;
+    if (k.x < 20 || k.x > W - 20) k.vx *= -0.6; if (k.y < STORE_Y + 20) k.vy *= -0.6; if (k.y > H - 20) k.vy *= -0.6;
+    k.x = clamp(k.x, 20, W - 20); k.y = clamp(k.y, STORE_Y + 20, H - 20);
+    for (const circ of carCircles(p)) { const d = dist(circ, k), m = circ.r + 13; if (d < m && d > 0) { const nx = (k.x - circ.x) / d, ny = (k.y - circ.y) / d; k.x += nx * (m - d); k.y += ny * (m - d); const rel = p.vx * nx + p.vy * ny;
+      if (rel > 0.6 && !k.cd) { k.vx = nx * rel * 1.6 + p.vx * 0.3; k.vy = ny * rel * 1.6 + p.vy * 0.3; k.va = rnd(-4, 4); k.cd = 0.6; sfx.thud(); p.vx *= 0.7; p.vy *= 0.7; if (rel > 1.5) hurt(3, pick(['Cart to the door', 'Who left this here?', 'Runaway cart'])); } } }
+    k.cd = Math.max(0, (k.cd || 0) - dt);
+    for (const s of spots) if (s.state === 'car' || s.state === 'double') { const n = circleRect(k, 12, spotRect(s)); if (n) { k.x += n.x * n.pen; k.y += n.y * n.pen; k.vx *= -0.3; k.vy *= -0.3; } }
+    if (CORRALS.some(c => inRect(k, { x: c.x + 6, y: c.y + 6, w: c.w - 12, h: c.h - 12 }))) { carts.splice(i, 1); S.carts++; career('carts', 1); S.score += 100; sfx.cash(); hurt(-5, 'Cart returned. A hero.'); rep(5); }
+  }
+  // --- pedestrians ---
+  for (let i = peds.length - 1; i >= 0; i--) {
+    const q = peds[i];
+    if (q.flung > 0) { q.flung -= dt; q.x += q.vx; q.y += q.vy; q.vx *= 0.9; q.vy *= 0.9; }
+    else {
+      q.phoneT -= dt; if (q.phoneT < 0 && q.stop <= 0) { q.stop = rnd(1, 2.5); q.phoneT = rnd(4, 10); if (Math.random() < 0.6) say(q, pick(PED_IDLE), 1.8); }
+      if (q.stop > 0 && q.hurry <= 0) q.stop -= dt;
+      else { const tgt = q.path[q.pi]; if (!tgt) { peds.splice(i, 1); spawnPed(Math.random() < 0.5); continue; } const d = dist(q, tgt), sp = q.speed * (q.hurry > 0 ? 2.6 : 1) * dt * 60; if (d < sp + 1) q.pi++; else { q.x += (tgt.x - q.x) / d * sp; q.y += (tgt.y - q.y) / d * sp; } }
+      q.hurry = Math.max(0, q.hurry - dt);
+    }
+    for (const circ of carCircles(p)) { const d = dist(circ, q), m = circ.r + 10; if (d < m && d > 0) { const nx = (q.x - circ.x) / d, ny = (q.y - circ.y) / d; q.x += nx * (m - d); q.y += ny * (m - d); const rel = p.vx * nx + p.vy * ny;
+      if (rel > 0.9 && q.flung <= 0) { q.flung = 1; q.vx = nx * 4; q.vy = ny * 4; p.vx *= 0.3; p.vy *= 0.3; S.peds++; say(q, pick(PED_HIT), 2, true); hurt(15, 'Bowled over a shopper'); sued(q); }
+      else if (q.flung <= 0 && Math.random() < 0.05) say(q, pick(['Excuse YOU', 'uh, hello?', 'pedestrians have right of way!']), 1.2, true); } }
+    // letting someone cross at the crosswalk while you wait is noticed
+    if (Math.abs(q.x - CROSS_X) < 30 && dist(q, p) < 90 && Math.abs(p.speed) < 0.2 && !q.thanked) { q.thanked = true; if (Math.random() < 0.4) { say(q, 'thanks!', 1); rep(2); } S.crossed++; }
+  }
+  // --- fights and sample crowds ---
+  for (let i = fights.length - 1; i >= 0; i--) {
+    const f = fights[i]; f.t -= dt; f.turn = Math.max(0, f.turn - dt);
+    if (f.life !== undefined) { f.life -= dt; if (f.life < 0) { fights.splice(i, 1); continue; } }
+    if (f.t < 0) { f.t = rnd(1.2, 2.8); say(f, f.crowd ? pick(['try the new ravioli', 'is this the line?', 'one per person, ma\'am', 'mmm', 'are these gluten free']) : pick(INSULTS), 1.8, !f.crowd); }
+    for (const circ of carCircles(p)) { const d = dist(circ, f), m = circ.r + 22; if (d < m && d > 0) { const nx = (circ.x - f.x) / d, ny = (circ.y - f.y) / d; p.x += nx * (m - d); p.y += ny * (m - d); if (Math.abs(p.speed) > 1) { p.vx *= 0.2; p.vy *= 0.2; say(f, f.crowd ? 'HEY, WE\'RE EATING' : 'HEY! WE\'RE TALKING HERE', 1.5, true); hurt(8, f.crowd ? 'Drove into the sample crowd' : 'Drove into an argument'); } } }
+  }
+  // --- cars leaving spots, with a waiter ---
+  leaveTimer -= dt;
+  if (leaveTimer < 0) {
+    leaveTimer = rnd(5, 9) - r * 0.4;
+    const near = spots.filter(s => s.state === 'car' && !s.access && dist(s, p) < 460 && dist(s, p) > 140);
+    if (near.length) {
+      const s = pick(near); s.state = 'leaving';
+      const c = newCar(s.x, s.y, s.face === -1 ? Math.PI : 0, s.block); c.color = s.color; c.mode = 'leave'; c.leaveT = 1.8; c.spotRef = s; cars.push(c); sfx.back();
+      const waiterChance = ev === 'blackfriday' ? 1 : 0.6 + r * 0.05;
+      if (Math.random() < waiterChance) { const wx = clamp(s.x + (Math.random() < 0.5 ? -70 : 70), 80, W - 80), w = newCar(wx, s.lane, Math.PI / 2, s.block); w.mode = 'wait'; w.spot = s; w.blink = 1; w.patience = rnd(6, 10); cars.push(w); toast('Someone is waiting for that spot, blinker on', 'good'); }
+      else if (S.rep > 40 && dist(s, p) < 300) { toast('They saw your blinker and waved you in', 'good'); } else toast('A spot is opening up', 'good');
+    }
+  }
+  spawnTimer -= dt;
+  if (spawnTimer < 0 && cars.filter(c => c.mode === 'cruise' || c.mode === 'enter').length < 4 + r) { spawnTimer = rnd(4, 8); const b = Math.floor(Math.random() * 4); const c = newCar(ENTRY.x, ENTRY.y + 10, 0, b); c.mode = 'enter'; c.wi = 3; c.circleT = rnd(10, 25); cars.push(c); }
+  // --- spot vultures ---
+  vultureCd -= dt;
+  if (vultureCd <= 0 && !doom) {
+    for (const s of spots) {
+      if (s.state !== 'free' || s.access) continue;
+      const d = dist(p, s); if (d > 230 || d < 40) continue;
+      const toward = ((s.x - p.x) * p.vx + (s.y - p.y) * p.vy) / d; if (toward < 0.6 || cars.some(o => o.spot === s)) continue;
+      if (Math.random() < dt * (0.45 + 0.12 * r) * repMul() * (ev === 'longweekend' ? 2.2 : 1)) {
+        const fromLeft = s.x > W / 2 ? false : true, sx = fromLeft ? -60 : W + 60, c = newCar(sx, s.lane, fromLeft ? Math.PI / 2 : -Math.PI / 2, s.block);
+        c.mode = 'snipe'; c.spot = s; c.stage = 0; c.fast = true; c.v = 5; c.color = pick(['#262a33', '#f4f4f2', '#c33b3b']); cars.push(c);
+        vultureCd = (rnd(7, 11) - r * 0.4) * (ev === 'longweekend' ? 0.5 : 1);
+        sfx.honk2(); setTimeout(sfx.honk2, 180); toast('Someone is flooring it down the lane for your spot', 'bad'); say(c, pick(['SEE YA, SLOWPOKE', 'MINE!', 'too slow, ****']), 1.6, true); break;
+      }
+    }
+  }
+  for (let i = skids.length - 1; i >= 0; i--) { skids[i].t -= dt; if (skids[i].t <= 0) skids.splice(i, 1); }
+  // --- NPC cars ---
+  for (let i = cars.length - 1; i >= 0; i--) {
+    const c = cars[i]; let target = null, speed = 2.3;
+    c.rageT = Math.max(0, c.rageT - dt); if (c.rageT <= 0) c.rage = 0;
+    if (c.mode === 'leave') { c.leaveT -= dt; c.v = -1.3; if (c.leaveT <= 0) { c.mode = 'exit'; c.v = 0; const s = c.spotRef; s.state = 'free'; const waiter = cars.find(o => o.mode === 'wait' && o.spot === s); if (waiter) { waiter.mode = 'snipe'; waiter.stage = 0; waiter.claimed = true; } } }
+    else if (c.mode === 'wait') {
+      c.patience -= dt; c.v *= 0.8;
+      if (c.spot.state === 'car' || c.spot.state === 'leaving' && c.spot.takenBy) { c.mode = 'exit'; say(c, pick(INSULTS), 2, true); if (c.spot.takenBy === 'player') { S.stole++; hurt(12, 'You took a spot someone was waiting for'); rep(-15); } else if (c.spot.takenBy) brawl(c.spot.x, c.spot.lane); }
+      else if (c.patience < 0) { c.mode = 'exit'; say(c, 'FORGET IT', 1.5, true); }
+      if (dist(c, p) < 120 && Math.random() < dt * 0.6) say(c, pick(['I\'m waiting for this one', 'blinker. BLINKER.', 'don\'t even think about it']), 1.5, true);
+    } else if (c.mode === 'hazard') { c.hazT -= dt; c.v *= 0.8; c.blink = 1; if (c.hazT < 0) { c.mode = 'exit'; c.blink = 0; say(c, 'see? two minutes', 1.4); } else if (dist(c, p) < 140 && Math.random() < dt * 0.5) say(c, pick(HAZARD), 1.6); }
+    else if (c.mode === 'boss') { c.hazT -= dt; c.v = 0; if (Math.random() < dt * 6) sparks.push({ x: c.x - Math.sin(c.a) * 34, y: c.y + Math.cos(c.a) * 34, vx: rnd(-0.3, 0.3), vy: rnd(-0.5, -0.2), t: 0.6, r: 5, smoke: true });
+      if (c.hazT < 0) { c.mode = 'exit'; say(c, 'ALRIGHT, ALRIGHT', 1.4, true); toast('The idler finally moved', 'good'); if (c.honked) S.idlerGone = true; } else if (dist(c, p) < 160 && Math.random() < dt * 0.35) say(c, pick(['engine\'s running, so what', 'I\'m on a call', 'almost done, relax', 'just finishing my hot dog']), 1.6); }
+    else if (c.mode === 'queue') { c.wait -= dt; c.v = c.wait < 0 ? 0.6 : 0; if (c.wait < -1.2) c.wait = rnd(4, 9); c.a = 0; if (dist(c, p) < 110 && Math.random() < dt * 0.3) say(c, pick(['gas is 8 cents cheaper', 'been here 40 minutes', 'worth it. probably.']), 1.6); }
+    else if (c.mode === 'stalk') { c.stalkT -= dt; target = { x: p.x - Math.sin(p.a) * 70, y: p.y + Math.cos(p.a) * 70 }; speed = 3.4; if (Math.random() < dt * 0.5) { sfx.honk2(); say(c, pick(['I\'M RIGHT BEHIND YOU', 'HONK AT ME AGAIN', 'WHERE YOU GOING?', 'I HAVE ALL DAY']), 1.6, true); } if (dist(c, p) < 90 && Math.random() < dt * 0.5) hurt(2); if (c.stalkT <= 0) { c.mode = 'exit'; say(c, 'not worth it', 1.3); } }
+    else if (c.mode === 'snipe') {
+      const s = c.spot;
+      if (s.state !== 'free') { if (c.fast && s.takenBy === 'player') S.vulturesBeaten++; c.mode = 'cruise'; c.spot = null; c.fast = false; }
+      else {
+        const stage = c.stage || 0; target = stage === 0 ? { x: s.x, y: s.lane } : { x: s.x, y: s.y };
+        if (stage === 0 && dist(c, target) < (c.fast ? 30 : 12)) { c.stage = 1; if (c.fast) sfx.thud(); } speed = stage === 1 ? (c.fast ? 2.4 : 1.4) : (c.fast ? 7 : 3);
+        if (c.fast && stage === 0 && Math.random() < dt * 20) skids.push({ x: c.x + rnd(-8, 8), y: c.y + rnd(-10, 10), t: 3 });
+        if (c.fast) peds.forEach(q => { if (dist(q, c) < 120) q.hurry = 2; });
+        if (stage === 1 && dist(c, { x: s.x, y: s.y }) < 8) {
+          s.state = 'car'; s.color = c.color; s.takenBy = c.claimed ? 'waiter' : 'sniper'; if (s.access) s.illegal = true; cars.splice(i, 1);
+          if (!c.claimed) { S.sniped++; if (dist(s, p) < 320) { lastTheft = { spot: s, t: S.t, lang: c.lang, fast: c.fast }; say({ x: s.x, y: s.y, lang: c.lang }, c.fast ? pick(['SEE YA, SLOWPOKE', 'SNOOZE YOU LOSE', 'should have been faster']) : pick(['MINE!', 'SNOOZE YOU LOSE', 'blinker? never heard of it', 'too slow, ****']), 2, true); hurt(c.fast ? 14 : 10, c.fast ? 'Spot stolen at full speed' : 'Spot sniped');
+            if (p.blink && dist(s, p) < 220) { brawl(s.x, s.lane); hurt(-8, 'Your blinker was on. The crowd sided with you.'); rep(5); } else toast('Press E (or OUT) to get out and argue', 'pa'); } }
+          else if (dist(s, p) < 320) say({ x: s.x, y: s.y, lang: c.lang }, 'finally.', 1.4);
+          continue;
+        }
+      }
+    } else if (c.mode === 'enter') { target = { x: LEFT_X, y: LANE_Y[4] }; speed = 2.6; if (dist(c, target) < 24) { c.mode = 'cruise'; c.wi = 0; } }
+    else if (c.mode === 'exit') { if (!c.exitPath) { const side = c.x < W / 2 ? LEFT_X : RIGHT_X; c.exitPath = [{ x: side, y: nearestLane(c.y) }, { x: side, y: LANE_Y[4] }, { x: side === LEFT_X ? 300 : 900, y: ROAD_Y + 60 }, { x: EXIT.x, y: EXIT.y }, { x: EXIT.x + 200, y: EXIT.y }]; c.ei = 0; } target = c.exitPath[c.ei]; speed = 2.8; if (target && dist(c, target) < 26) c.ei++; if (!target || c.x > W + 60) { cars.splice(i, 1); continue; } }
+    if (c.mode === 'cruise') {
+      c.circleT -= dt; target = c.wp[c.wi]; if (dist(c, target) < 24) c.wi = (c.wi + 1) % 4;
+      if (c.circleT < 0) { c.mode = 'exit'; say(c, pick(['forget it, I\'m going home', 'ordering online', 'this is **** ridiculous']), 1.6, true); }
+      for (const s of spots) {
+        if (s.state !== 'free' || !c.wp.some(w => w.y === s.lane)) continue;
+        const wanted = cars.some(o => o.mode === 'wait' && o.spot === s), nearPlayer = dist(s, p) < 240;
+        if (nearPlayer && p.blink && S.rep > -20 && Math.random() < 0.7) continue;           // an honest driver respects your blinker
+        const chance = s.access ? 0.08 : (nearPlayer && Math.abs(p.speed) < 2.5 ? (0.5 + 0.25 * r) * repMul() : 0.12);
+        if (dist(s, c) < 420 && Math.random() < dt * chance) { c.mode = 'snipe'; c.spot = s; c.stage = 0; say(c, s.access ? 'I\'ll only be five minutes' : wanted ? 'they were waiting? so?' : 'ooh, a spot', 1.3); break; }
+      }
+    }
+    if (target) {
+      const want = Math.atan2(target.x - c.x, -(target.y - c.y)), d = angDiff(c.a, want); c.a += clamp(d, -2.6 * dt, 2.6 * dt);
+      const ahead = { x: c.x + Math.sin(c.a) * 62, y: c.y - Math.cos(c.a) * 62 };
+      const blocked = c.fast ? dist(ahead, p) < 40 : (dist(ahead, p) < 46 || (walker && dist(ahead, walker) < 36) || peds.some(q => dist(ahead, q) < 34) || fights.some(f => dist(ahead, f) < 40) || cars.some(o => o !== c && dist(ahead, o) < 42) || carts.some(k => dist(ahead, k) < 24));
+      if (blocked) { c.v *= 0.7; c.wait += dt; if (c.wait > 1.1 && dist(c, p) < 120) { c.wait = 0; sfx.honk2(); say(c, walker ? pick(['WHOSE CAR IS THIS?!', 'IS THAT YOUR CAR?', 'YOU LEFT IT THERE?!']) : pick(['MOVE IT!!', 'ANY DAY NOW', 'HONK HONK ****', 'ARE YOU PARKING OR WHAT']), 1.6, true); if (dist(c, p) < 90) hurt(2); } }
+      else { c.wait = 0; c.v += (speed * (Math.abs(d) > 1 ? 0.5 : 1) - c.v) * (c.fast ? 6 : 2.5) * dt; }
+    }
+    c.x += Math.sin(c.a) * c.v * dt * 60; c.y -= Math.cos(c.a) * c.v * dt * 60;
+    if (c.mode !== 'leave') resolveStatic(c, false);
+    const n = carVsCar(p, c);
+    if (n) { const rel = -(p.vx * n.x + p.vy * n.y); if (rel > 1.1 && !c.cd) { c.cd = 1; p.vx += n.x * rel * 1.2; p.vy += n.y * rel * 1.2; say(c, pick(INSULTS), 1.8, true); ding('Fender bender'); } }
+    for (const o of cars) if (o !== c && dist(o, c) < 70) carVsCar(c, o);
+    c.cd = Math.max(0, c.cd - dt);
+    if (c.x < -120 || c.x > W + 260 || c.y > H + 100) cars.splice(i, 1);
+  }
+  for (let i = sparks.length - 1; i >= 0 && !doom; i--) { const k = sparks[i]; k.t -= dt; k.x += k.vx; k.y += k.vy; if (k.t <= 0) sparks.splice(i, 1); }
+  for (let i = bubbles.length - 1; i >= 0; i--) { bubbles[i].t -= dt; if (bubbles[i].t <= 0) bubbles.splice(i, 1); }
+  if (!onFoot) { cam.x += (p.x + p.vx * 12 - cam.x) * Math.min(1, dt * 5); cam.y += (p.y + p.vy * 12 - cam.y) * Math.min(1, dt * 5); }
+  missionTick();
+  if (S.patience <= 0) return gameOver();
+}
+function nearestLane(y) { let b = LANE_Y[0]; for (const ly of LANE_Y) if (Math.abs(ly - y) < Math.abs(b - y)) b = ly; return b; }
+
+// ---------- rounds ----------
+function finishRound(spot) {
+  S.running = false; spot.takenBy = 'player'; spot.state = 'car'; spot.color = V().color; if (spot.pair) { spot.pair.state = 'hidden'; } sfx.thunk();
+  const waiter = cars.find(o => o.mode === 'wait' && o.spot === spot);
+  const straightness = Math.max(0, 1 - Math.abs(Math.sin(player.a)) / 0.35);
+  let pts = Math.round(500 + S.patience * 12 + straightness * 200 + Math.max(0, 60 - S.t) * 5 + (S.peds === 0 ? 150 : 0) + (spot.tightOf ? 250 : 0) + (S.vehicle === 'pickup' ? 200 : 0));
+  const msgs = [];
+  if (spot.access) { pts = Math.round(pts * 0.3) - 300; msgs.push('You parked in an accessible spot. A $300 ticket is on your windshield before you reach the door, and everyone saw.'); sfx.lose(); say({ x: spot.x, y: spot.y }, 'REALLY? THAT SPOT?', 2, true); rep(-25); }
+  else { sfx.win(); rep(3); }
+  if (spot.tightOf) msgs.push('You squeezed into the gap next to the double-parker. Their mirror is folded now. Oops.');
+  if (S.vehicle === 'van') { const nearCorral = CORRALS.some(c => dist(spot, { x: c.x + c.w / 2, y: c.y + c.h / 2 }) < 260); if (nearCorral) { pts += 150; msgs.push('Cart return right there. The kids made it inside alive.'); } else { pts -= 150; msgs.push('The kids walked through traffic with a flatbed. Points off.'); } }
+  if (waiter) { pts -= 150; msgs.push('The person with the blinker on is now following you into the store.'); say(waiter, pick(INSULTS), 2, true); rep(-15); S.stole++; }
+  msgs.push(straightness > 0.8 ? 'Dead straight. People will think you care.' : 'Slightly crooked. Someone will photograph it.');
+  if (S.peds === 0) msgs.push('Zero shoppers harmed. Bonus.');
+  if (S.sniped) msgs.push(`${S.sniped} spot${S.sniped > 1 ? 's' : ''} got sniped from under you.`);
+  if (S.carts) msgs.push(`${S.carts} cart${S.carts > 1 ? 's' : ''} returned. The lot thanks you.`);
+  if (!spot.access) msgs.push(spot.y > 900 ? 'It\'s a long walk to the door, though.' : 'And it\'s close to the door. Unheard of.');
+  // vultures still racing for this spot lose
+  cars.forEach(c => { if (c.fast && c.spot === spot) S.vulturesBeaten++; });
+  const doneNow = []; for (const m of S.missions) { if (!m.done && ((m.park && m.park(spot)) || (m.live && m.live()))) { m.done = true; S.missionsDone++; career('missions', 1); pts += m.reward; doneNow.push(m); } } renderMissions();
+  const missed = S.missions.filter(m => !m.done);
+  $('missionMsg').textContent = (doneNow.length ? `Missions done: ${doneNow.map(m => `${m.text} (+${m.reward})`).join(', ')}. ` : '') + (missed.length ? `Missed: ${missed.map(m => m.text).join(', ')}.` : 'All missions done!');
+  career('roundsMax', S.round, true); careerSet('vehicles', S.vehicle); if (spot.tightOf) career('tight', 1);
+  S.score += pts; S.log.push({ round: S.round, pts, event: S.event.name });
+  const nextUnlock = Object.values(VEHICLES).find(v => v.unlock === S.round + 1);
+  if (nextUnlock && S.unlocked < S.round + 1) { S.unlocked = S.round + 1; try { localStorage.setItem('loc-unlocked', String(S.unlocked)); } catch (e) {} }
+  $('unlockMsg').textContent = nextUnlock ? `Unlocked: ${nextUnlock.name}. Pick it for the next trip if you dare.` : '';
+  fillVehicleSelect($('vehicle2'));
+  $('roundTitle').textContent = spot.access ? 'Parked. Badly.' : 'Parked!'; $('roundPts').textContent = `${pts >= 0 ? '+' : ''}${pts}`; $('roundMsg').textContent = msgs.join(' ');
+  $('roundOv').hidden = false; updateHud();
+}
+function titleFor(reason) {
+  if (reason === 'fire') return 'Accidental Arsonist'; if (reason === 'sued') return 'The Defendant'; if (reason === 'towed') return 'Impound Regular';
+  if (S.stole >= 1) return 'Spot Thief'; if (S.carts >= 2) return 'Cart Whisperer'; if (S.honkTotal >= 12) return 'Horn Section';
+  if (S.argued >= 1) return 'Lot Lawyer'; if (S.hits >= 2) return 'Menace'; if (S.blinkUsed && S.stole === 0) return 'Blinker Believer';
+  if (S.peds === 0 && S.hits === 0 && S.honkTotal < 4) return 'Saint of Lane 3'; return 'Regular Member';
+}
+function gameOver(reason) {
+  S.running = false; if (!reason) sfx.lose(); S.outcome = reason || 'quit';
+  if (S.score > S.best) { S.best = S.score; try { localStorage.setItem('loc-best', String(S.best)); } catch (e) {} }
+  career('bestGame', S.score, true); if (reason === 'fire') career('fire', 1); if (reason === 'sued') career('sued', 1); if (titleFor(reason) === 'Saint of Lane 3') career('saint', 1);
+  const title = reason === 'towed' ? pick(['Towed', 'Your car is gone', 'Impound lot: $180']) : reason === 'fire' ? pick(['Your car caught fire', 'Total loss', 'Three dings. Smoke. Flames.']) : reason === 'sued' ? pick(['You\'ve been served', 'See you in court', 'Lawsuit: $2.4 million']) : pick(['You gave up', 'Patience: zero', 'You went home', 'Ordered online instead']);
+  const msg = reason === 'towed' ? pick(['You left it in the lane. The tow truck did not leave it in the lane.', 'The impound lot is 40 minutes away and closes at 5.', 'The tow driver was very polite about it, which somehow made it worse.']) : reason === 'fire' ? pick(['Third ding was one too many. The hot dog line watched it burn.', 'The fire department parked in the accessible spot to put it out.', 'Your insurance adjuster says this is a first.'])
+    : reason === 'sued' ? pick(['The shopper had a receipt, a witness, and a cousin who\'s a lawyer.', 'They were fine until they saw your car. Then the limp started.', 'The dashcam from the car behind you has already been emailed to three law firms.'])
+    : pick(['You drove straight back out and bought everything at a store with aisle numbers.', 'You parked on the grass, got a ticket, and still had to walk.', 'You sat in the car and ate the rotisserie chicken you didn\'t buy, in your mind.', 'You joined the fight in lane 2. It felt right.']);
+  $('overTitle').textContent = title; $('overMsg').textContent = msg;
+  const img = $('receiptImg'); img.src = drawReceipt(reason); img.hidden = false; $('copyMsg').textContent = '';
+  saveScore(); renderLeaderboard(); $('overOv').hidden = false; updateHud();
+}
+function drawReceipt(reason) {
+  const c = document.createElement('canvas'), x = c.getContext('2d'); const W2 = 340, lines = [];
+  const money = n => `${n < 0 ? '-' : ''}$${(Math.abs(n) / 100).toFixed(2)}`;
+  lines.push(['COSTC0 WHOLESALE', 'h']); lines.push([`#${S.mode === 'daily' ? 'DAILY ' + S.seed : 'RANDOM LOT'}`, 'c']); lines.push([new Date().toLocaleString(), 'c']); lines.push(['MEMBER: YOU', 'c']); lines.push(['', '']);
+  lines.push([`TRIPS COMPLETED`, S.log.filter(l => l.pts !== undefined).length]); lines.push([`ROUND REACHED`, S.round]); lines.push([`VEHICLE`, V().name.toUpperCase()]); lines.push(['', '']);
+  lines.push([`DINGS x${S.hits}`, money(-S.hits * 650)]); lines.push([`SHOPPERS HIT x${S.peds}`, money(-S.peds * 240000)]); lines.push([`SPOTS SNIPED x${S.sniped}`, money(-S.sniped * 450)]);
+  lines.push([`SPOTS STOLEN x${S.stole}`, money(-S.stole * 999)]); lines.push([`CARTS RETURNED x${S.carts}`, money(S.carts * 100)]); lines.push([`HONKS x${S.honkTotal}`, money(-S.honkTotal * 25)]); lines.push([`ARGUMENTS x${S.argued}`, money(S.argued * 150)]); lines.push([`MISSIONS x${S.missionsDone}`, money(S.missionsDone * 500)]);
+  lines.push([`PATIENCE LEFT`, `${Math.max(0, Math.round(S.patience))}%`]); lines.push([`REPUTATION`, `${S.rep > 0 ? '+' : ''}${Math.round(S.rep)}`]); lines.push(['', '']);
+  lines.push(['TOTAL', `${S.score} PTS`]); lines.push([`TITLE: ${titleFor(reason).toUpperCase()}`, 'c']); lines.push(['', '']);
+  lines.push([reason === 'fire' ? 'VEHICLE: TOTAL LOSS' : reason === 'sued' ? 'SEE YOU IN COURT' : reason === 'towed' ? 'TOWING FEE  $180.00' : 'THANK YOU FOR GIVING UP', 'c']); lines.push(['HOT DOG + DRINK  $1.50', 'c']); lines.push(['', '']);
+  const Hh = 40 + lines.length * 18 + 70; c.width = W2 * 2; c.height = Hh * 2; x.scale(2, 2);
+  x.fillStyle = '#fff'; x.fillRect(0, 0, W2, Hh); x.fillStyle = '#111'; x.textBaseline = 'top';
+  let y = 22;
+  for (const [a, b] of lines) {
+    if (b === 'h') { x.font = '900 20px "Courier New", monospace'; x.textAlign = 'center'; x.fillText(a, W2 / 2, y - 4); y += 24; continue; }
+    x.font = '14px "Courier New", monospace';
+    if (b === 'c') { x.textAlign = 'center'; x.fillText(a, W2 / 2, y); }
+    else if (a === 'TOTAL') { x.font = '900 16px "Courier New", monospace'; x.textAlign = 'left'; x.fillText(a, 20, y); x.textAlign = 'right'; x.fillText(String(b), W2 - 20, y); }
+    else if (a) { x.textAlign = 'left'; x.fillText(a, 20, y); x.textAlign = 'right'; x.fillText(String(b), W2 - 20, y); }
+    y += 18;
+  }
+  // barcode
+  let seed = S.score + S.round * 31; const rg = mulberry(seed); x.fillStyle = '#111'; let bx = 40;
+  while (bx < W2 - 40) { const w = 1 + Math.floor(rg() * 3); x.fillRect(bx, y + 6, w, 36); bx += w + 1 + Math.floor(rg() * 3); }
+  x.font = '11px "Courier New", monospace'; x.textAlign = 'center'; x.fillText(`${String(S.score).padStart(8, '0')} ${S.seed || '0000'}`, W2 / 2, y + 46);
+  return c.toDataURL('image/png');
+}
+function saveScore() {
+  try { const key = S.mode === 'daily' ? `loc-lb-${S.seed}` : 'loc-lb-random'; const lb = JSON.parse(localStorage.getItem(key) || '[]'); lb.push({ score: S.score, title: titleFor(S.outcome), round: S.round, when: Date.now() }); lb.sort((a, b) => b.score - a.score); localStorage.setItem(key, JSON.stringify(lb.slice(0, 5))); } catch (e) {}
+}
+function renderLeaderboard() {
+  const ul = $('lb'); ul.innerHTML = '';
+  try { const key = S.mode === 'daily' ? `loc-lb-${S.seed}` : 'loc-lb-random'; const lb = JSON.parse(localStorage.getItem(key) || '[]');
+    lb.forEach((e, i) => { const li = document.createElement('li'); li.innerHTML = `<span>${i + 1}. ${e.title} (round ${e.round})</span><span>${e.score}</span>`; if (e.score === S.score && e.when > Date.now() - 5000) li.style.fontWeight = '900'; ul.appendChild(li); });
+    if (!lb.length) ul.innerHTML = '<li><span>No scores yet</span></li>'; } catch (e) { ul.innerHTML = '<li><span>Scores need browser storage</span></li>'; }
+}
+function startRound() {
+  S.patience = 100; S.t = 0; S.hits = 0; S.peds = 0; S.sniped = 0; S.honks = []; S.carts = 0; S.argued = 0; S.crossed = 0; S.argueWins = 0; S.honksRound = 0; S.idlerGone = false; S.vulturesBeaten = 0;
+  makeLot(S.round); S.running = false; startEngine(); updateHud();
+  const tag = $('eventTag'); if (S.event.name) { tag.textContent = `${S.event.name}: ${S.event.desc}`; tag.hidden = false; } else tag.hidden = true;
+  // briefing card: where you are, what's going on, what the missions are
+  const day = DAYS[Math.min(S.round - 1, DAYS.length - 1)];
+  $('briefRound').textContent = `Trip ${S.round}`; $('briefEvent').textContent = S.event.name ? `${S.event.name}` : day; $('briefDesc').textContent = S.event.name ? `${S.event.desc} (${day})` : 'A normal day. Nothing is normal.';
+  $('briefMissions').innerHTML = S.missions.map(m => `<div><span>${m.text}</span><span>+${m.reward}</span></div>`).join('');
+  $('briefVehicle').textContent = `Driving the ${V().name}.`; $('briefOv').hidden = false;
+  if (voices && !muted && S.round === 1) { lastSpoke = 0; speak('Welcome to Costco zero. Good luck.', false); }
+}
+function drive() { $('briefOv').hidden = true; S.running = true; renderMissions(); toast(`Trip ${S.round}: ${S.event.name || DAYS[Math.min(S.round - 1, DAYS.length - 1)]}`, 'good'); }
+function newGame() {
+  S.round = 1; S.score = 0; S.stole = 0; S.rep = 0; S.honkTotal = 0; S.blinkUsed = false; S.log = []; S.missionsDone = 0;
+  S.mode = $('mode').value; S.seed = S.mode === 'daily' ? +todayKey() : Math.floor(Math.random() * 1e6);
+  S.vehicle = $('vehicle').value; if (VEHICLES[S.vehicle].unlock > S.unlocked) S.vehicle = 'sedan';
+  startRound();
+}
+function updateHud() {
+  const pat = $('pat'); pat.style.width = `${clamp(S.patience, 0, 100)}%`; pat.style.background = S.patience > 50 ? 'var(--good)' : S.patience > 25 ? 'var(--warn)' : 'var(--bad)';
+  $('rep').style.left = `${50 + S.rep / 2}%`; $('score').textContent = S.score; $('round').textContent = S.round;
+  $('free').textContent = spots.filter(s => s.state === 'free' && !s.access).length; $('best').textContent = S.best; $('dings').textContent = `${Math.min(S.hits, 3)} / 3`;
+}
+function fillVehicleSelect(sel) {
+  sel.innerHTML = ''; for (const [k, v] of Object.entries(VEHICLES)) { const o = document.createElement('option'); o.value = k; o.textContent = v.unlock > S.unlocked ? `${v.name} (unlocks round ${v.unlock})` : v.name; o.disabled = v.unlock > S.unlocked; if (k === S.vehicle) o.selected = true; sel.appendChild(o); }
+}
+
+// ---------- render ----------
+const cv = $('c'), ctx = cv.getContext('2d'); let dpr = 1;
+function resize() { dpr = Math.min(2, window.devicePixelRatio || 1); const r = cv.getBoundingClientRect(); cv.width = Math.round(r.width * dpr); cv.height = Math.round(r.height * dpr); }
+window.addEventListener('resize', resize);
+function rrect(x, y, w, h, r) { ctx.beginPath(); ctx.moveTo(x + r, y); ctx.arcTo(x + w, y, x + w, y + h, r); ctx.arcTo(x + w, y + h, x, y + h, r); ctx.arcTo(x, y + h, x, y, r); ctx.arcTo(x, y, x + w, y, r); ctx.closePath(); }
+function drawCar(c, color, isPlayer, blink) {
+  ctx.save(); ctx.translate(c.x, c.y); ctx.rotate(c.a); const w = c.w, l = c.l;
+  if (isPlayer && S.vehicle === 'pickup') { // trailer behind the cab
+    ctx.fillStyle = 'rgba(0,0,0,.28)'; rrect(-w / 2 + 3, 8, w, l / 2 - 8, 6); ctx.fill(); ctx.fillStyle = '#8a6b4a'; rrect(-w / 2, 4, w, l / 2 - 8, 6); ctx.fill(); ctx.strokeStyle = 'rgba(0,0,0,.5)'; ctx.lineWidth = 2; ctx.stroke();
+    ctx.fillStyle = 'rgba(0,0,0,.28)'; rrect(-w / 2 + 3, -l / 2 + 5, w, l / 2 + 2, 8); ctx.fill(); ctx.fillStyle = color; rrect(-w / 2, -l / 2, w, l / 2 + 2, 8); ctx.fill(); ctx.stroke();
+    ctx.fillStyle = 'rgba(30,45,70,.8)'; rrect(-w / 2 + 5, -l / 2 + 13, w - 10, 14, 4); ctx.fill();
+  } else {
+    ctx.fillStyle = 'rgba(0,0,0,.28)'; rrect(-w / 2 + 3, -l / 2 + 5, w, l, 8); ctx.fill();
+    ctx.fillStyle = color; rrect(-w / 2, -l / 2, w, l, 8); ctx.fill(); ctx.strokeStyle = 'rgba(0,0,0,.5)'; ctx.lineWidth = 2; ctx.stroke();
+    ctx.fillStyle = 'rgba(255,255,255,.18)'; rrect(-w / 2 + 3, -l / 2 + 3, w - 6, 8, 4); ctx.fill();
+    ctx.fillStyle = 'rgba(30,45,70,.8)'; rrect(-w / 2 + 5, -l / 2 + 13, w - 10, 14, 4); ctx.fill(); rrect(-w / 2 + 5, l / 2 - 20, w - 10, 10, 4); ctx.fill();
+  }
+  ctx.fillStyle = '#fff3b0'; ctx.fillRect(-w / 2 + 4, -l / 2 - 1, 8, 4); ctx.fillRect(w / 2 - 12, -l / 2 - 1, 8, 4);
+  ctx.fillStyle = '#ff5a5a'; ctx.fillRect(-w / 2 + 4, l / 2 - 3, 8, 4); ctx.fillRect(w / 2 - 12, l / 2 - 3, 8, 4);
+  if (blink && Math.floor(S.t * 3) % 2 === 0) { ctx.fillStyle = '#ffb000'; [[-w / 2 - 1, -l / 2 + 2], [w / 2 - 5, -l / 2 + 2], [-w / 2 - 1, l / 2 - 8], [w / 2 - 5, l / 2 - 8]].forEach(([x, y]) => ctx.fillRect(x, y, 6, 6)); }
+  if (isPlayer) { ctx.fillStyle = '#fff'; ctx.font = '900 11px Nunito, sans-serif'; ctx.textAlign = 'center'; ctx.fillText('YOU', 0, 4); }
+  ctx.restore();
+}
+function drawCart(k) { ctx.save(); ctx.translate(k.x, k.y); ctx.rotate(k.a); ctx.fillStyle = 'rgba(0,0,0,.22)'; ctx.fillRect(-9, -11, 20, 24); ctx.fillStyle = '#b9c2cc'; ctx.strokeStyle = '#44505c'; ctx.lineWidth = 2; ctx.fillRect(-10, -12, 20, 24); ctx.strokeRect(-10, -12, 20, 24); ctx.beginPath(); for (let i = -8; i <= 8; i += 4) { ctx.moveTo(i, -12); ctx.lineTo(i, 12); } ctx.stroke(); ctx.fillStyle = '#e31837'; ctx.fillRect(-11, 10, 22, 4); ctx.restore(); }
+function drawCartLocal() { ctx.fillStyle = '#b9c2cc'; ctx.strokeStyle = '#44505c'; ctx.lineWidth = 2; ctx.fillRect(-9, -11, 18, 22); ctx.strokeRect(-9, -11, 18, 22); ctx.fillStyle = '#e31837'; ctx.fillRect(-10, 9, 20, 3); }
+function drawPed(q) { ctx.save(); ctx.translate(q.x, q.y); if (q.cart) { const t = q.path[q.pi] || q; const a = Math.atan2(t.x - q.x, -(t.y - q.y)); ctx.save(); ctx.rotate(a); ctx.translate(0, -22); drawCartLocal(); ctx.restore(); } ctx.fillStyle = 'rgba(0,0,0,.25)'; ctx.beginPath(); ctx.ellipse(2, 4, 11, 9, 0, 0, 6.28); ctx.fill(); ctx.fillStyle = q.shirt; ctx.beginPath(); ctx.arc(0, 0, 11, 0, 6.28); ctx.fill(); ctx.fillStyle = q.skin; ctx.beginPath(); ctx.arc(0, 0, 7, 0, 6.28); ctx.fill(); ctx.strokeStyle = 'rgba(0,0,0,.4)'; ctx.lineWidth = 1.5; ctx.beginPath(); ctx.arc(0, 0, 11, 0, 6.28); ctx.stroke(); ctx.restore(); }
+function drawFight(f) {
+  const j = Math.sin(S.t * 14) * 1.5, heads = f.crowd ? [{ x: -22, y: -4, s: '#3d7bd9' }, { x: 0, y: -12, s: '#56a35a' }, { x: 22, y: -2, s: '#f08c1b' }, { x: -10, y: 16, s: '#7e5bc2' }, { x: 14, y: 18, s: '#d94f8a' }] : [{ x: -14, y: 0, s: '#c33b3b' }, { x: 14, y: 2, s: '#3d7bd9' }, { x: 0, y: 18, s: '#56a35a' }];
+  if (f.crowd) { ctx.fillStyle = '#f4f4f2'; ctx.fillRect(f.x - 26, f.y - 30, 52, 14); ctx.fillStyle = '#e31837'; ctx.font = '900 8px Nunito, sans-serif'; ctx.textAlign = 'center'; ctx.fillText('FREE SAMPLES', f.x, f.y - 20); }
+  heads.forEach((m, i) => { ctx.save(); ctx.translate(f.x + m.x + (f.crowd ? 0 : (i % 2 ? -j : j)), f.y + m.y); ctx.fillStyle = 'rgba(0,0,0,.25)'; ctx.beginPath(); ctx.ellipse(2, 4, 11, 9, 0, 0, 6.28); ctx.fill(); ctx.fillStyle = m.s; ctx.beginPath(); ctx.arc(0, 0, 11, 0, 6.28); ctx.fill(); ctx.fillStyle = '#e0ac69'; ctx.beginPath(); ctx.arc(0, 0, 7, 0, 6.28); ctx.fill(); if (!f.crowd) { ctx.fillStyle = '#d7263d'; ctx.beginPath(); ctx.arc(0, 0, 3, 0, 6.28); ctx.fill(); } ctx.restore(); });
+  if (f.turn > 0) { ctx.save(); ctx.translate(f.x, f.y - 36); ctx.fillStyle = '#ffcc00'; ctx.font = '900 14px Nunito, sans-serif'; ctx.textAlign = 'center'; ctx.fillText('!!!', 0, 0); ctx.restore(); }
+}
+function drawBubble(b) { const e = b.e; ctx.save(); ctx.translate(e.x, e.y - 36); ctx.font = '800 12px Nunito, "Noto Sans", "Segoe UI", system-ui, sans-serif'; ctx.direction = b.rtl ? 'rtl' : 'ltr'; const w = ctx.measureText(b.text).width + 16; ctx.fillStyle = b.bad ? '#fff1f0' : '#ffffff'; ctx.strokeStyle = b.bad ? '#d7263d' : '#1d2230'; ctx.lineWidth = 2; rrect(-w / 2, -14, w, 24, 8); ctx.fill(); ctx.stroke(); ctx.beginPath(); ctx.moveTo(-5, 10); ctx.lineTo(0, 18); ctx.lineTo(5, 10); ctx.closePath(); ctx.fill(); ctx.stroke(); ctx.fillStyle = b.bad ? '#d7263d' : '#1d2230'; ctx.textAlign = 'center'; ctx.fillText(b.text, 0, 3); ctx.restore(); }
+function drawAccessSymbol(x, y) { ctx.save(); ctx.translate(x, y); ctx.strokeStyle = '#fff'; ctx.fillStyle = '#fff'; ctx.lineWidth = 3; ctx.lineCap = 'round'; ctx.beginPath(); ctx.arc(-2, -10, 3.5, 0, 6.28); ctx.fill(); ctx.beginPath(); ctx.moveTo(-2, -5); ctx.lineTo(-2, 4); ctx.lineTo(6, 4); ctx.lineTo(9, 11); ctx.stroke(); ctx.beginPath(); ctx.arc(-3, 7, 7, -Math.PI * 0.9, Math.PI * 0.6); ctx.stroke(); ctx.restore(); }
+function render() {
+  const cw = cv.width, ch = cv.height;
+  ctx.setTransform(1, 0, 0, 1, 0, 0); ctx.fillStyle = '#3f4654'; ctx.fillRect(0, 0, cw, ch);
+  if (!player) return;
+  const zoom = clamp(Math.min(cw / (720 * dpr), ch / (720 * dpr)), 0.55, 1.6) * dpr;
+  const camx = clamp(cam.x, cw / 2 / zoom, W - cw / 2 / zoom), camy = clamp(cam.y, ch / 2 / zoom, H - ch / 2 / zoom);
+  ctx.setTransform(zoom, 0, 0, zoom, cw / 2 - camx * zoom + (player.bump ? rnd(-3, 3) : 0), ch / 2 - camy * zoom);
+  const rain = S.event.id === 'rain';
+  ctx.fillStyle = rain ? '#3f4753' : '#4b525f'; ctx.fillRect(0, 0, W, H);
+  ctx.fillStyle = rain ? 'rgba(120,150,190,.25)' : 'rgba(0,0,0,.1)'; for (let i = 0; i < 14; i++) { ctx.beginPath(); ctx.ellipse((i * 379) % W, 200 + (i * 557) % (H - 300), rain ? 50 : 30, rain ? 22 : 14, i, 0, 6.28); ctx.fill(); }
+  ctx.fillStyle = '#5a9a4a'; ctx.fillRect(0, ROAD_Y, W, H - ROAD_Y); ctx.fillStyle = '#3a404b'; ctx.fillRect(0, ROAD_Y + 20, W, 84);
+  ctx.strokeStyle = '#ffcc00'; ctx.lineWidth = 3; ctx.setLineDash([24, 18]); ctx.beginPath(); ctx.moveTo(0, ROAD_Y + 62); ctx.lineTo(W, ROAD_Y + 62); ctx.stroke(); ctx.setLineDash([]);
+  ctx.fillStyle = '#4b525f'; ctx.fillRect(LEFT_X - 40, ROAD_Y - 2, 90, 30); ctx.fillRect(RIGHT_X - 50, ROAD_Y - 2, 90, 30);
+  ctx.fillStyle = '#1fa35a'; ctx.fillRect(ENTRY.x - 36, ROAD_Y + 108, 72, 24); ctx.fillStyle = '#fff'; ctx.font = '900 13px Nunito, sans-serif'; ctx.textAlign = 'center'; ctx.fillText('ENTER', ENTRY.x, ROAD_Y + 125);
+  ctx.fillStyle = '#e31837'; ctx.fillRect(EXIT.x - 36, ROAD_Y + 108, 72, 24); ctx.fillStyle = '#fff'; ctx.fillText('EXIT', EXIT.x, ROAD_Y + 125);
+  ctx.fillStyle = 'rgba(255,255,255,.85)'; for (let x = 0; x < W; x += 60) ctx.fillRect(x, ROAD_Y + 18, 30, 4);
+  ctx.fillStyle = 'rgba(255,255,255,.18)'; LANE_Y.forEach((ly, i) => { for (let x = 160; x < W - 100; x += 300) { const d = i % 2 ? -1 : 1; ctx.beginPath(); ctx.moveTo(x, ly - 6); ctx.lineTo(x + 40 * d, ly - 6); ctx.lineTo(x + 40 * d, ly - 14); ctx.lineTo(x + 58 * d, ly); ctx.lineTo(x + 40 * d, ly + 14); ctx.lineTo(x + 40 * d, ly + 6); ctx.lineTo(x, ly + 6); ctx.fill(); } });
+  // store
+  ctx.fillStyle = '#e7e2d6'; ctx.fillRect(0, 0, W, STORE_Y); ctx.fillStyle = '#c9c2b2'; ctx.fillRect(0, STORE_Y - 10, W, 10); ctx.fillStyle = '#e31837'; ctx.fillRect(0, 0, W, 10);
+  ctx.fillStyle = '#005daa'; ctx.fillRect(390, 16, 420, 60); ctx.fillStyle = '#e31837'; ctx.fillRect(390, 60, 420, 16);
+  ctx.fillStyle = '#fff'; ctx.font = '40px "Luckiest Guy", Impact, sans-serif'; ctx.textAlign = 'center'; ctx.fillText('COSTC0', 600, 60); ctx.font = '900 11px Nunito, sans-serif'; ctx.fillText('WHOLESALE  ·  MEMBERS ONLY  ·  ROTISSERIE INSIDE', 600, 72);
+  ctx.fillStyle = '#2b3646'; ctx.fillRect(CROSS_X - 50, 84, 100, 36); ctx.fillStyle = '#fff'; ctx.font = '900 14px Nunito, sans-serif'; ctx.fillText('ENTRANCE', CROSS_X, 108);
+  ctx.fillStyle = '#2b3646'; ctx.fillRect(900, 84, 90, 36); ctx.fillStyle = '#fff'; ctx.fillText('TIRES', 945, 108);
+  ctx.fillStyle = '#ffcc00'; ctx.fillRect(180, 84, 130, 36); ctx.fillStyle = '#1d2230'; ctx.fillText('HOT DOG $1.50', 245, 108);
+  ctx.fillStyle = '#2b3646'; ctx.fillRect(1030, 84, 110, 36); ctx.fillStyle = '#fff'; ctx.fillText(S.event.id === 'gas' ? 'GAS  →' : 'PHARMACY', 1085, 108);
+  ctx.fillStyle = 'rgba(255,255,255,.75)'; for (let y = STORE_Y; y < 220; y += 24) ctx.fillRect(CROSS_X - 40, y + 4, 80, 12);
+  // corrals
+  for (const k of CORRALS) { ctx.fillStyle = 'rgba(255,255,255,.08)'; ctx.fillRect(k.x, k.y, k.w, k.h); ctx.strokeStyle = '#ffcc00'; ctx.lineWidth = 3; ctx.strokeRect(k.x, k.y, k.w, k.h); ctx.fillStyle = '#ffcc00'; ctx.font = '900 10px Nunito, sans-serif'; ctx.textAlign = 'center'; ctx.save(); ctx.translate(k.x + k.w / 2, k.y + k.h / 2); ctx.rotate(-Math.PI / 2); ctx.fillText('CART RETURN', 0, 4); ctx.restore(); }
+  // spots
+  ctx.lineWidth = 3;
+  for (const s of spots) {
+    if (s.state === 'hidden') continue; const x = s.x - SPOT_W / 2, y = s.y - SPOT_L / 2;
+    if (s.access) { ctx.fillStyle = '#2b6fc2'; ctx.fillRect(x + 2, y + 2, SPOT_W - 4, SPOT_L - 4); if (s.state === 'free') drawAccessSymbol(s.x, s.y); }
+    ctx.strokeStyle = s.state === 'free' && !s.access ? '#5ef08a' : 'rgba(255,255,255,.8)';
+    ctx.beginPath(); ctx.moveTo(x, y); ctx.lineTo(x, y + SPOT_L); ctx.moveTo(x + SPOT_W, y); ctx.lineTo(x + SPOT_W, y + SPOT_L); ctx.stroke();
+    if (s.state === 'free' && !s.access) { ctx.strokeStyle = 'rgba(94,240,138,.95)'; ctx.setLineDash([6, 6]); ctx.strokeRect(x + 3, y + 3, SPOT_W - 6, SPOT_L - 6); ctx.setLineDash([]); }
+    if (s.state === 'tight' && V().w <= 26) { ctx.strokeStyle = 'rgba(240,140,27,.95)'; ctx.setLineDash([4, 4]); ctx.strokeRect(s.x - 2, y + 3, 24, SPOT_L - 6); ctx.setLineDash([]); }
+    if (s.state === 'leaving') { ctx.strokeStyle = '#ffcc00'; ctx.setLineDash([4, 4]); ctx.strokeRect(x + 3, y + 3, SPOT_W - 6, SPOT_L - 6); ctx.setLineDash([]); }
+  }
+  for (const s of spots) {
+    if (s.state === 'car') { drawCar({ x: s.x, y: s.y, a: s.face === -1 ? Math.PI : 0, w: 34, l: 62 }, s.color); if (s.illegal && Math.floor(S.t * 2) % 2 === 0) { ctx.fillStyle = '#ffcc00'; ctx.font = '900 11px Nunito, sans-serif'; ctx.textAlign = 'center'; ctx.fillText('no permit', s.x, s.y - 40); } }
+    else if (s.state === 'double') drawCar({ x: s.x + SPOT_W / 2 - 6, y: s.y, a: (s.face === -1 ? Math.PI : 0) + s.tilt, w: 36, l: 64 }, s.color);
+  }
+  ctx.fillStyle = 'rgba(20,20,20,.35)'; for (const k of skids) { ctx.globalAlpha = Math.min(1, k.t / 3); ctx.fillRect(k.x - 3, k.y - 2, 6, 4); } ctx.globalAlpha = 1;
+  for (const k of carts) drawCart(k);
+  for (const f of fights) drawFight(f);
+  for (const c of cars) drawCar(c, c.color, false, c.blink);
+  for (const q of peds) drawPed(q);
+  drawCar(player, doom === 'fire' ? '#3a2a24' : V().color, true, player.blink);
+  for (const k of sparks) { const f = k.t; ctx.fillStyle = k.smoke ? `rgba(120,120,120,${f * 0.5})` : (f > 0.5 ? `rgba(255,${Math.floor(120 + 120 * f)},40,${f})` : `rgba(80,80,80,${f * 0.8})`); ctx.beginPath(); ctx.arc(k.x, k.y, k.r * (f > 0.5 || k.smoke ? 1 : 1.8), 0, 6.28); ctx.fill(); }
+  if (doom === 'sued') { const o = Math.min(1, (2.2 - doomT) / 0.8); [[-60, -20], [58, -10], [0, 56]].forEach(([dx, dy]) => { ctx.save(); ctx.translate(player.x + dx * o, player.y + dy * o); ctx.fillStyle = 'rgba(0,0,0,.25)'; ctx.beginPath(); ctx.ellipse(2, 4, 11, 9, 0, 0, 6.28); ctx.fill(); ctx.fillStyle = '#1d2230'; ctx.beginPath(); ctx.arc(0, 0, 11, 0, 6.28); ctx.fill(); ctx.fillStyle = '#e0ac69'; ctx.beginPath(); ctx.arc(0, 0, 7, 0, 6.28); ctx.fill(); ctx.fillStyle = '#8a6b4a'; ctx.fillRect(-14, 8, 12, 9); ctx.restore(); }); if (o > 0.9) { ctx.fillStyle = '#fff'; ctx.font = '900 13px Nunito, sans-serif'; ctx.textAlign = 'center'; ctx.fillText('YOU\'VE BEEN SERVED', player.x, player.y - 48); } }
+  if (walker) { const w = walker; ctx.save(); ctx.translate(w.x, w.y); ctx.fillStyle = 'rgba(0,0,0,.25)'; ctx.beginPath(); ctx.ellipse(2, 4, 12, 10, 0, 0, 6.28); ctx.fill(); ctx.fillStyle = V().color; ctx.beginPath(); ctx.arc(0, 0, 12, 0, 6.28); ctx.fill(); ctx.fillStyle = '#f1c27d'; ctx.beginPath(); ctx.arc(0, 0, 7.5, 0, 6.28); ctx.fill(); ctx.strokeStyle = '#1d2230'; ctx.lineWidth = 2; ctx.beginPath(); ctx.arc(0, 0, 12, 0, 6.28); ctx.stroke(); ctx.fillStyle = '#fff'; ctx.font = '900 10px Nunito, sans-serif'; ctx.textAlign = 'center'; ctx.fillText('YOU', 0, -18); ctx.restore();
+    if (dist(w, player) < 56) { ctx.fillStyle = '#ffcc00'; ctx.font = '900 11px Nunito, sans-serif'; ctx.textAlign = 'center'; ctx.fillText('E: get in', player.x, player.y - 46); } }
+  if (doom === 'towed') { const o = Math.min(1, (2.6 - doomT) / 1.2); ctx.save(); ctx.translate(player.x + 120 - o * 80, player.y - 60 + o * 10); ctx.fillStyle = '#ffcc00'; rrect(-24, -40, 48, 80, 8); ctx.fill(); ctx.strokeStyle = '#1d2230'; ctx.lineWidth = 2; ctx.stroke(); ctx.fillStyle = '#1d2230'; ctx.fillRect(-18, -34, 36, 18); ctx.fillStyle = '#1d2230'; ctx.font = '900 9px Nunito, sans-serif'; ctx.textAlign = 'center'; ctx.fillText('TOW', 0, 20); ctx.restore(); if (o > 0.8) { ctx.fillStyle = '#fff'; ctx.font = '900 13px Nunito, sans-serif'; ctx.textAlign = 'center'; ctx.fillText('HOOKED', player.x, player.y - 48); } }
+  if (argue) { ctx.save(); ctx.translate((walker || player).x + 30, (walker || player).y - 20); ctx.fillStyle = '#e31837'; ctx.beginPath(); ctx.arc(0, 0, 11, 0, 6.28); ctx.fill(); ctx.fillStyle = '#f1c27d'; ctx.beginPath(); ctx.arc(0, 0, 7, 0, 6.28); ctx.fill(); ctx.restore(); }
+  for (const b of bubbles) drawBubble(b);
+  if (parkTimer > 0) { ctx.strokeStyle = '#5ef08a'; ctx.lineWidth = 5; ctx.beginPath(); ctx.arc(player.x, player.y, 46, -Math.PI / 2, -Math.PI / 2 + parkTimer / 0.8 * Math.PI * 2); ctx.stroke(); }
+  if (rain) { ctx.strokeStyle = 'rgba(200,220,255,.35)'; ctx.lineWidth = 1.5; ctx.beginPath(); const off = (rainT * 900) % 40; for (let i = 0; i < 160; i++) { const x = (i * 97 + off * 0.3) % W, y = ((i * 193) + off * 12) % H; ctx.moveTo(x, y); ctx.lineTo(x - 4, y + 14); } ctx.stroke(); }
+  // minimap
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  const mw = 84, mh = 109, mx = cw / dpr - mw - 10, my = 10;
+  ctx.fillStyle = 'rgba(14,18,28,.72)'; rrect(mx - 4, my - 4, mw + 8, mh + 8, 6); ctx.fill();
+  ctx.fillStyle = '#e7e2d6'; ctx.fillRect(mx, my, mw, mh * STORE_Y / H); ctx.fillStyle = '#5a9a4a'; ctx.fillRect(mx, my + mh * ROAD_Y / H, mw, mh * (H - ROAD_Y) / H);
+  const sx = mw / W, sy = mh / H;
+  for (const s of spots) if (s.state === 'free') { ctx.fillStyle = s.access ? '#4d9cf0' : '#5ef08a'; ctx.fillRect(mx + s.x * sx - 2, my + s.y * sy - 2, 4, 4); }
+  for (const k of CORRALS) { ctx.fillStyle = '#ffcc00'; ctx.fillRect(mx + k.x * sx, my + k.y * sy, k.w * sx, k.h * sy); }
+  for (const c of cars) { ctx.fillStyle = c.fast || c.mode === 'stalk' ? '#ff3b57' : c.blink ? '#ffb000' : '#ffffff'; ctx.fillRect(mx + c.x * sx - 1, my + c.y * sy - 1, 2, 2); }
+  ctx.fillStyle = '#ff3b57'; ctx.beginPath(); ctx.arc(mx + player.x * sx, my + player.y * sy, 3, 0, 6.28); ctx.fill();
+  if (walker) { ctx.fillStyle = '#ffcc00'; ctx.beginPath(); ctx.arc(mx + walker.x * sx, my + walker.y * sy, 3, 0, 6.28); ctx.fill(); }
+}
+
+// ---------- loop ----------
+let last = performance.now();
+function frame(now) { const dt = Math.min(0.05, (now - last) / 1000); last = now; if (S.running) { update(dt); updateHud(); } else engineTick(0, 0, false); render(); requestAnimationFrame(frame); }
+
+// ---------- input ----------
+const KEYMAP = { ArrowUp: 'up', KeyW: 'up', ArrowDown: 'down', KeyS: 'down', ArrowLeft: 'left', KeyA: 'left', ArrowRight: 'right', KeyD: 'right', Space: 'honk', KeyH: 'honk', KeyB: 'blink', KeyE: 'out' };
+window.addEventListener('keydown', e => { if (e.target && e.target.tagName === 'SELECT') return; const k = KEYMAP[e.code]; if (k) { keys[k] = 1; e.preventDefault(); } });
+window.addEventListener('keyup', e => { const k = KEYMAP[e.code]; if (k) { if (k === 'out' || k === 'blink') setTimeout(() => { keys[k] = 0; }, 60); else keys[k] = 0; e.preventDefault(); } });
+document.querySelectorAll('.pad .k').forEach(el => { const k = el.dataset.k, on = e => { e.preventDefault(); keys[k] = 1; el.classList.add('on'); }, off = e => { e.preventDefault(); keys[k] = 0; el.classList.remove('on'); }; el.addEventListener('pointerdown', on); el.addEventListener('pointerup', off); el.addEventListener('pointercancel', off); el.addEventListener('pointerleave', off); });
+$('startBtn').addEventListener('click', () => { $('startOv').hidden = true; newGame(); });
+$('goBtn').addEventListener('click', drive);
+$('nextBtn').addEventListener('click', () => { $('roundOv').hidden = true; S.vehicle = $('vehicle2').value || S.vehicle; S.round++; startRound(); });
+$('againBtn').addEventListener('click', () => { $('overOv').hidden = true; $('startOv').hidden = false; fillVehicleSelect($('vehicle')); });
+$('mute').addEventListener('click', e => { muted = !muted; e.currentTarget.textContent = muted ? 'Sound: off' : 'Sound: on'; e.currentTarget.setAttribute('aria-pressed', String(muted)); try { if (muted) window.speechSynthesis.cancel(); } catch (x) {} });
+$('voice').addEventListener('click', e => { voices = !voices; e.currentTarget.textContent = voices ? 'Voices: on' : 'Voices: off'; e.currentTarget.setAttribute('aria-pressed', String(voices)); try { if (!voices) window.speechSynthesis.cancel(); } catch (x) {} });
+$('saveBtn').addEventListener('click', async () => {
+  const name = `lot-of-chaos-receipt-${S.score}.png`, blob = await (await fetch($('receiptImg').src)).blob();
+  const dl = window.claude && window.claude.use ? await window.claude.use('downloads').catch(() => null) : null;
+  if (dl) { try { await dl.save({ filename: name, data: blob }); $('copyMsg').textContent = 'Receipt saved.'; } catch (e) { $('copyMsg').textContent = e && e.code === 'declined' ? 'No receipt. Fair.' : 'Could not save here. Long-press or right-click the receipt instead.'; } return; }
+  if (!location.hostname.endsWith('claude.ai')) { const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = name; document.body.appendChild(a); a.click(); a.remove(); }
+  else $('copyMsg').textContent = 'Long-press or right-click the receipt to save it.';
+});
+$('copyBtn').addEventListener('click', e => {
+  const url = `${location.href.split('#')[0]}#c-${S.score}-${S.seed}-${S.mode === 'daily' ? 'd' : 'r'}`;
+  const text = `I scored ${S.score} in Lot of Chaos (${titleFor(S.outcome)}). Beat me: ${url}`;
+  const done = () => { $('copyMsg').textContent = 'Copied. Send it to someone who deserves a bad Saturday.'; };
+  try { navigator.clipboard.writeText(text).then(done).catch(() => { $('copyMsg').textContent = text; }); } catch (x) { $('copyMsg').textContent = text; }
+});
+try { window.speechSynthesis && window.speechSynthesis.getVoices(); } catch (e) {}
+// challenge link: #c-<score>-<seed>-<d|r>
+(() => { const m = /^#c-(\d+)-(\d+)-([dr])$/.exec(location.hash); if (!m) return; const ch = $('challenge'); ch.hidden = false; ch.textContent = `Challenge: someone scored ${m[1]} on ${m[3] === 'd' ? 'the daily lot of ' + m[2] : 'a random lot'}. Beat it.`; if (m[3] === 'd' && m[2] === todayKey()) $('mode').value = 'daily'; })();
+function renderCareer() { const ul = $('career'); ul.innerHTML = CAREER.map(c => { const v = Math.min(c.target, c.get(S.career)); return `<li class="${v >= c.target ? 'done' : ''}"><span>${c.text}</span><span>${v} / ${c.target}</span></li>`; }).join(''); }
+renderCareer(); $('againBtn').addEventListener('click', renderCareer);
+fillVehicleSelect($('vehicle'));
+resize(); S.seed = +todayKey(); makeLot(1); updateHud(); requestAnimationFrame(frame);
+})();
+</script>
+
 </body>
 </html>
